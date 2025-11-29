@@ -34,20 +34,20 @@ const SCHOOL_CLASSES = [
     "JHS1", "JHS2", "JHS3", "SHS1", "SHS2", "SHS3"
 ];
 
-// --- 1. DOM Element References ---
+// --- 1. DOM Element References (All references are included here) ---
 const authStatusEl = document.getElementById('auth-status');
 
-// Auth/User Info (only needed on index.html)
+// Auth/User Info (index.html)
 const loginEmailEl = document.getElementById('loginEmail');
 const loginPasswordEl = document.getElementById('loginPassword');
 const loginBtn = document.getElementById('loginBtn');
 const registerBtn = document.getElementById('registerBtn');
 
-// Main App Elements (only needed on app.html)
+// Main App Elements (app.html)
 const logoutBtn = document.getElementById('logoutBtn');
 const userNameEl = document.getElementById('userName');
 const tabBtns = document.querySelectorAll('.tab-btn');
-const moduleSections = document.querySelectorAll('.module-section'); // Used for module switching within app.html
+const moduleSections = document.querySelectorAll('.module-section'); 
 
 // Attendance Module References
 const attClassEl = document.getElementById('attClass');
@@ -90,7 +90,7 @@ const studentListBodyEl = document.getElementById('studentListBody');
 // --- 2. CORE UTILITY FUNCTIONS ---
 
 function updateStatus(message, type = 'info') {
-    if (authStatusEl) { // Check if the status element exists on this page
+    if (authStatusEl) { // Check if the status element exists on the current page
         authStatusEl.textContent = message;
         const colors = {
             info: { bg: '#e0f7fa', text: '#01579b' },
@@ -129,9 +129,6 @@ function switchModule(moduleId) {
         }
     });
     
-    // Auto-scroll is no longer needed since we are using separate pages, 
-    // but the SPA logic for module switching is kept for the app.html view
-    
     if (moduleId === 'grade') {
         loadGradingItems();
     } else if (moduleId === 'headmaster-dashboard') {
@@ -153,8 +150,11 @@ auth.onAuthStateChanged(user => {
         } 
         // If the user is on the app page (app.html), populate user info.
         else if (document.title.includes("Application")) {
-            userNameEl.textContent = user.email;
-            updateStatus(`Welcome back, ${user.email}!`, 'success');
+            // Check if element exists before accessing it (Safety check for App page)
+            if (userNameEl) { 
+                userNameEl.textContent = user.email;
+                updateStatus(`Welcome back, ${user.email}!`, 'success');
+            }
         }
     } 
     // 2. If user is NOT logged in:
@@ -675,31 +675,48 @@ async function loadDashboardSummary() {
 
 // --- 8. EVENT LISTENERS & INITIAL SETUP ---
 
-// Check which page we are on to attach correct listeners
-if (document.title.includes("Login")) {
-    // Authentication Buttons (Only run on index.html)
-    registerBtn.addEventListener('click', handleRegister);
-    loginBtn.addEventListener('click', handleLogin);
+// Main Application Initialization Function
+function initializeApplication() {
+    // Check which page we are on to attach correct listeners
+    if (document.title.includes("Login")) {
+        // Authentication Buttons
+        loginBtn.addEventListener('click', handleLogin);
+        registerBtn.addEventListener('click', handleRegister);
 
-} else if (document.title.includes("Application")) {
-    // These only run on app.html
-    
-    // Module Tabs
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => switchModule(btn.getAttribute('data-module')));
-    });
+    } else if (document.title.includes("Application")) {
+        
+        // Populate all dropdowns first
+        populateClassDropdowns();
 
-    // Logout Button
-    logoutBtn.addEventListener('click', handleLogout);
+        // Module Tabs
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => switchModule(btn.getAttribute('data-module')));
+        });
 
-    // Attendance Module
-    loadStudentsBtn.addEventListener('click', handleLoadStudents);
-    saveAttendanceBtn.addEventListener('click', handleSaveAttendance);
-    // ... (other listeners)
-    
-    // Call setup functions 
-    populateClassDropdowns();
-    // Start on the Attendance Module on load
-    switchModule('attendance');
+        // Logout Button
+        logoutBtn.addEventListener('click', handleLogout);
+
+        // Attendance Module
+        loadStudentsBtn.addEventListener('click', handleLoadStudents);
+        saveAttendanceBtn.addEventListener('click', handleSaveAttendance);
+
+        // Gradebook Module
+        addGradeItemBtn.addEventListener('click', handleAddGradeItem);
+        loadGradeStudentsBtn.addEventListener('click', handleLoadGradeStudents);
+        saveGradesBtn.addEventListener('click', handleSaveGrades);
+
+        // Parent Portal Module
+        lookupBtn.addEventListener('click', handleLookupRecords);
+
+        // Headmaster Dashboard Management
+        addStudentBtn.addEventListener('click', handleAddStudent);
+        newStudentClassEl.addEventListener('change', loadStudentsByClass);
+        
+        // Start on the Attendance Module on load
+        switchModule('attendance');
+    }
 }
 
+// 🔑 NEW FIX: Wait for the entire page structure to load before running initialization 
+// This resolves the blank screen issue on app.html
+window.addEventListener('load', initializeApplication);
