@@ -2,7 +2,7 @@
 
 // --- FIREBASE CONFIGURATION & INITIALIZATION ---
 
-// YOUR UNIQUE firebaseConfig OBJECT IS NOW PASTED HERE!
+// YOUR UNIQUE firebaseConfig OBJECT IS NOW PASTE HERE!
 const firebaseConfig = {
     apiKey: "AIzaSyDt1nGhKNXz6bLfLILUfJ_RnfD45_VgVX0",
     authDomain: "scholarlink-sms-app.firebaseapp.com",
@@ -14,7 +14,7 @@ const firebaseConfig = {
 };
 // --- END FIREBASE CONFIGURATION ---
 
-// Initialize Firebase (We use the simple older syntax for compatibility)
+// Initialize Firebase using the simple method
 firebase.initializeApp(firebaseConfig);
 
 // Database and Authentication References
