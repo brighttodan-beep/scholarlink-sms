@@ -78,9 +78,12 @@ function updateStatus(message, type = 'info') {
 }
 
 function switchModule(moduleId) {
+    // Hide all modules
     moduleSections.forEach(sec => sec.classList.remove('active'));
+    // Show the selected module
     document.getElementById(moduleId).classList.add('active');
 
+    // Update button styling
     tabBtns.forEach(btn => {
         btn.classList.remove('active');
         if (btn.getAttribute('data-module') === moduleId) {
@@ -88,6 +91,7 @@ function switchModule(moduleId) {
         }
     });
     
+    // Load grading items when gradebook tab is clicked
     if (moduleId === 'grade') {
         loadGradingItems();
     }
@@ -95,15 +99,16 @@ function switchModule(moduleId) {
     updateStatus(`Module ready: ${moduleId}.`);
 }
 
-// --- 3. AUTHENTICATION LOGIC (UNCORRECTED) ---
+// --- 3. AUTHENTICATION LOGIC ---
 
+// Handles screen switching based on login status
 auth.onAuthStateChanged(user => {
     if (user) {
         authScreenEl.classList.remove('active');
         mainAppScreenEl.classList.add('active');
         userNameEl.textContent = user.email;
         updateStatus(`Welcome back, ${user.email}!`, 'success');
-        switchModule('attendance');
+        switchModule('attendance'); // Default view
     } else {
         authScreenEl.classList.add('active');
         mainAppScreenEl.classList.remove('active');
@@ -152,7 +157,7 @@ function handleLogout() {
 }
 
 
-// --- 4. ATTENDANCE LOGIC (UNCORRECTED) ---
+// --- 4. ATTENDANCE LOGIC ---
 
 const DUMMY_STUDENTS = [
     "Kwame Nkrumah", "Yaa Asantewaa", "John Kufuor", "Ama Ghana", "Kofi Annan"
@@ -236,7 +241,7 @@ async function handleSaveAttendance() {
 }
 
 
-// --- 5. GRADEBOOK LOGIC (CORRECTED) ---
+// --- 5. GRADEBOOK LOGIC (FIXED) ---
 
 async function handleAddGradeItem() {
     if (!auth.currentUser) {
@@ -283,7 +288,7 @@ async function loadGradingItems() {
     if (!auth.currentUser) return;
     
     try {
-        // FIX APPLIED: Removed the .where() filter to bypass the index issue.
+        // FIX: Removed the .where() filter to bypass the index issue and ensure loading works.
         const snapshot = await db.collection(GRADING_ITEM_COLLECTION).get();
         
         gradingItemSelectEl.innerHTML = '<option value="">-- Select Test/Assignment --</option>';
@@ -291,13 +296,16 @@ async function loadGradingItems() {
         snapshot.forEach(doc => {
             const item = doc.data();
             const option = document.createElement('option');
-            option.value = doc.id;
-            option.textContent = `${item.subject}: ${item.name} (Max: ${item.totalMarks})`;
-            option.dataset.max = item.totalMarks;
-            gradingItemSelectEl.appendChild(option);
+            // Filter here in the code, ensuring only items created by the current user are shown (Client-side filter)
+            if (item.createdBy === auth.currentUser.email) { 
+                option.value = doc.id;
+                option.textContent = `${item.subject}: ${item.name} (Max: ${item.totalMarks})`;
+                option.dataset.max = item.totalMarks;
+                gradingItemSelectEl.appendChild(option);
+            }
         });
         
-        updateStatus(`Loaded ${snapshot.size} grading items.`);
+        updateStatus(`Loaded ${gradingItemSelectEl.options.length - 1} grading items.`);
     } catch (error) {
         updateStatus("Error loading grading items.", 'error');
     }
@@ -359,4 +367,60 @@ async function handleSaveGrades() {
         const scoreInput = row.cells[1].querySelector('.score-input');
         const score = parseInt(scoreInput.value);
 
-        if (!isNaN(score) && scoreInput
+        if (!isNaN(score) && scoreInput.value.trim() !== '' && score >= 0 && score <= totalMarks) {
+             gradeRecords.push({ 
+                student: studentName, 
+                score: score, 
+                max: totalMarks 
+            });
+        }
+    });
+
+    if (gradeRecords.length === 0) {
+        updateStatus("Nothing to save.", 'error');
+        return;
+    }
+    
+    updateStatus('Saving student grades to the Cloud...', 'info');
+
+    try {
+        const docId = `${selectedItemId}_${selectedClass}`; 
+        
+        await db.collection(GRADES_COLLECTION).doc(docId).set({
+            gradingItemId: selectedItemId,
+            gradingItemName: selectedItem.textContent,
+            class: selectedClass,
+            totalMarks: totalMarks,
+            grades: gradeRecords,
+            savedBy: auth.currentUser.email,
+            savedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        updateStatus(`SUCCESS! ${gradeRecords.length} grades saved for ${selectedClass}.`, 'success');
+    } catch (error) {
+        console.error("Firebase Grade Save Error:", error);
+        updateStatus(`ERROR! Failed to save grades: ${error.message}`, 'error');
+    }
+}
+
+
+// --- 6. EVENT LISTENERS & INITIAL SETUP ---
+
+// Authentication Buttons
+registerBtn.addEventListener('click', handleRegister);
+loginBtn.addEventListener('click', handleLogin);
+logoutBtn.addEventListener('click', handleLogout);
+
+// Module Tabs
+tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => switchModule(btn.getAttribute('data-module')));
+});
+
+// Attendance Module
+loadStudentsBtn.addEventListener('click', handleLoadStudents);
+saveAttendanceBtn.addEventListener('click', handleSaveAttendance);
+
+// Gradebook Module
+addGradeItemBtn.addEventListener('click', handleAddGradeItem);
+loadGradeStudentsBtn.addEventListener('click', handleLoadGradeStudents);
+saveGradesBtn.addEventListener('click', handleSaveGrades);
