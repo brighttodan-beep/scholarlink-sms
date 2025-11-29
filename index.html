@@ -122,7 +122,43 @@
 
             </div>
 
-            <div id="parent-portal" class="module-section"><h2>Parent Portal</h2><p>Development starting soon...</p></div>
+            <div id="parent-portal" class="module-section">
+                <h2>Student Record Lookup</h2>
+                <div class="input-group">
+                    <label for="lookupName">Student Full Name:</label>
+                    <input type="text" id="lookupName" placeholder="e.g., Ama Ghana">
+                    
+                    <label for="lookupClass">Select Class:</label>
+                    <select id="lookupClass">
+                        <option value="JHS3">JHS 3</option>
+                        <option value="JHS2">JHS 2</option>
+                        <option value="P6">Primary 6</option>
+                        <option value="P5">Primary 5</option>
+                    </select>
+                    
+                    <button id="lookupBtn" class="primary-btn">View Student Records</button>
+                </div>
+
+                <div id="records-display" style="margin-top: 20px;">
+                    <h3>Records for: <span id="studentNameDisplay"></span></h3>
+                    
+                    <h4>Attendance Summary</h4>
+                    <ul id="attendanceSummary"></ul>
+                    
+                    <h4>Gradebook Summary</h4>
+                    <table id="gradesSummaryTable">
+                        <thead>
+                            <tr>
+                                <th>Test/Assignment</th>
+                                <th>Score</th>
+                                <th>Max</th>
+                            </tr>
+                        </thead>
+                        <tbody id="gradesSummaryBody">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
             
             <div id="headmaster-dashboard" class="module-section"><h2>Headmaster Dashboard</h2><p>Development starting soon...</p></div>
         </div>
