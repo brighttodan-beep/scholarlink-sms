@@ -1,121 +1,242 @@
 body {
-    font-family: sans-serif;
-    background-color: #f0f2f5;
-    color: #333;
+    font-family: Arial, sans-serif;
     margin: 0;
-    padding: 20px;
+    padding: 0;
+    background-color: #f4f4f4;
+    color: #333;
 }
+
 .container {
-    max-width: 800px;
+    max-width: 1200px;
     margin: 0 auto;
-    background: white;
     padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
 }
-h1 { 
-    color: #1a56db; /* Deep Blue for professionalism */
+
+h1 {
+    color: #01579b; /* Dark Blue */
     text-align: center;
-    border-bottom: 2px solid #ddd;
+    border-bottom: 2px solid #ccc;
     padding-bottom: 10px;
 }
+
+h2 {
+    color: #0288d1; /* Medium Blue */
+}
+
+/* Status Bar */
 .status {
     padding: 10px;
-    background: #e0f7fa;
-    border: 1px solid #4fc3f7;
-    border-radius: 5px;
-    margin-bottom: 20px;
+    margin: 10px 0;
+    border-radius: 4px;
+    font-weight: bold;
+    text-align: center;
+    background-color: #e0f7fa;
     color: #01579b;
 }
-/* Tabs Styling */
-.tabs {
-    display: flex;
-    justify-content: space-around;
-    margin-bottom: 20px;
-    border-bottom: 1px solid #eee;
-}
-.tab-btn {
-    flex-grow: 1;
-    padding: 10px 15px;
-    border: none;
-    cursor: pointer;
-    background-color: #f8f9fa;
-    color: #495057;
-    font-weight: bold;
-    border-bottom: 3px solid transparent;
-    transition: all 0.2s;
-}
-.tab-btn.active {
-    background-color: white;
-    color: #1a56db;
-    border-bottom: 3px solid #1a56db;
-}
-/* Module Sections */
-.module-section {
+
+/* Auth and Main Screen Toggle */
+.screen:not(.active) {
     display: none;
-    padding: 15px 0;
 }
-.module-section.active {
-    display: block;
-}
-h2 {
-    color: #1a56db;
-    margin-top: 0;
-    font-size: 1.5em;
-    border-bottom: 1px solid #f0f0f0;
-    padding-bottom: 5px;
-}
-label, input, select, button {
-    margin-top: 10px;
-    padding: 8px;
-    border-radius: 4px;
-}
-.input-group {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-}
-.input-group label, .input-group select, .input-group input {
-    flex-grow: 1;
-    display: block;
-}
+
 /* Buttons */
 .primary-btn {
-    background-color: #1a56db;
+    background-color: #0288d1;
     color: white;
-    padding: 10px 20px;
+    padding: 10px 15px;
     border: none;
-    border-radius: 5px;
+    border-radius: 4px;
     cursor: pointer;
-    margin-top: 20px;
-    width: 100%;
+    margin: 5px 0;
+    transition: background-color 0.3s;
 }
-.primary-btn:hover { background-color: #1c4fd3; }
-.primary-btn:disabled { background-color: #a8b1ff; cursor: not-allowed; }
+
+.primary-btn:hover:not(:disabled) {
+    background-color: #01579b;
+}
+
+.primary-btn:disabled {
+    background-color: #b3e5fc;
+    cursor: not-allowed;
+}
 
 .secondary-btn {
-    background-color: #6c757d;
-    color: white;
-    padding: 10px 20px;
-    border: none;
-    border-radius: 5px;
+    background-color: #f4f4f4;
+    color: #0288d1;
+    padding: 10px 15px;
+    border: 1px solid #0288d1;
+    border-radius: 4px;
     cursor: pointer;
-    margin-top: 20px;
-    flex-shrink: 0; /* Prevents it from growing too wide */
+    margin: 5px 0;
+    transition: background-color 0.3s;
 }
 
-/* Table Styles */
-#attendanceTable {
+.secondary-btn:hover {
+    background-color: #e0f7fa;
+}
+
+.logout-btn {
+    background: none;
+    border: none;
+    color: #e53935; /* Red */
+    cursor: pointer;
+    font-size: 0.9em;
+    margin-left: 10px;
+}
+
+/* Input/Group Styling */
+.auth-group {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 15px;
+}
+
+.auth-group label, .input-group label {
+    margin-top: 10px;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+input[type="email"], input[type="password"], input[type="text"], input[type="number"], input[type="date"], select {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Tabs */
+.tabs {
+    display: flex;
+    justify-content: flex-start;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #ddd;
+}
+
+.tab-btn {
+    padding: 10px 15px;
+    border: none;
+    background-color: #f4f4f4;
+    color: #333;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.3s;
+}
+
+.tab-btn.active {
+    background-color: #e0f7fa;
+    color: #01579b;
+    border-bottom: 3px solid #01579b;
+}
+
+/* Module Sections */
+.module-section {
+    padding: 20px;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.input-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    align-items: flex-end;
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+    border: 1px solid #eee;
+}
+
+.input-group > * {
+    flex-grow: 1;
+    min-width: 150px;
+}
+
+/* Tables */
+table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 15px;
+    margin-bottom: 20px;
 }
-#attendanceTable th, #attendanceTable td {
+
+th, td {
     border: 1px solid #ddd;
     padding: 10px;
     text-align: left;
 }
-#attendanceTable select {
-    width: 100%;
+
+th {
+    background-color: #0288d1;
+    color: white;
+}
+
+/* Parent Portal Styling */
+#records-display h4 {
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 5px;
+    margin-top: 20px;
+    color: #01579b;
+}
+#records-display ul {
+    list-style: none;
+    padding: 0;
+}
+#records-display ul li {
+    margin-bottom: 5px;
+    padding: 5px 0;
+}
+
+/* Dashboard Styling */
+.summary-cards {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+}
+
+.card {
+    flex: 1;
+    min-width: 250px;
+    background-color: #e0f7fa;
+    border: 1px solid #b3e5fc;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.card h3 {
+    margin-top: 0;
+    color: #01579b;
+}
+
+.card p {
+    font-size: 2em;
+    font-weight: bold;
+    color: #0288d1;
+}
+
+/* --- LOGIN SCREEN CENTERING (NEW) --- */
+#auth-screen {
+    max-width: 400px;
+    margin: 40px auto;
+    padding: 30px;
     border: 1px solid #ccc;
+    border-radius: 8px;
+    background-color: #ffffff;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+#auth-screen h2 {
+    text-align: center;
+    color: #01579b; 
+    margin-top: 0;
+}
+
+/* Ensure main screen is not visible when inactive */
+#main-app-screen:not(.active) {
+    display: none;
 }
