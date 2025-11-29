@@ -1,4 +1,4 @@
-// main.js - Main logic for ScholarLink SMS (Firebase-Controlled Initialization)
+// main.js - Main logic for ScholarLink SMS (Final Structural Fix)
 
 // --- FIREBASE CONFIGURATION & INITIALIZATION ---
 
@@ -34,7 +34,7 @@ const SCHOOL_CLASSES = [
     "JHS1", "JHS2", "JHS3", "SHS1", "SHS2", "SHS3"
 ];
 
-// --- 1. DOM Element References (All references are included here) ---
+// --- 1. DOM Element References ---
 const authStatusEl = document.getElementById('auth-status');
 
 // Auth/User Info (index.html)
@@ -192,16 +192,11 @@ auth.onAuthStateChanged(user => {
         if (document.title.includes("Login")) {
             window.location.href = 'app.html';
         } 
-        // If on the Application page (app.html), initialize the app structure.
+        // If on the Application page (app.html):
         else if (document.title.includes("Application")) {
-             // 🔑 NEW FIX: Run initialization ONLY when the user is confirmed AND the DOM is ready.
-             // We use a small check here to ensure the core elements exist first.
-             if (document.readyState === 'complete') {
-                initializeApplicationLogic(user);
-             } else {
-                 // Wait for the full page load before initializing the app structure
-                 window.addEventListener('load', () => initializeApplicationLogic(user));
-             }
+             // 🔑 FINAL FIX: Add a listener that waits for the *entire* page (including styles, etc.) to load 
+             // before initializing the visual components. This prevents the "blank screen" crash.
+             window.addEventListener('load', () => initializeApplicationLogic(user));
         }
     } 
     // 2. If user is NOT logged in:
@@ -215,6 +210,7 @@ auth.onAuthStateChanged(user => {
 
 
 async function handleRegister() {
+    // ... (logic remains the same)
     const email = loginEmailEl.value;
     const password = loginPasswordEl.value;
     
@@ -233,6 +229,7 @@ async function handleRegister() {
 }
 
 async function handleLogin() {
+    // ... (logic remains the same)
     const email = loginEmailEl.value;
     const password = loginPasswordEl.value;
     
@@ -257,7 +254,7 @@ function handleLogout() {
 
 
 // --- 4. ATTENDANCE LOGIC (Unchanged) ---
-// ... (Your attendance logic remains here)
+// ... (All existing module logic functions are unchanged and follow this line)
 
 function renderAttendanceTable(students) {
     attendanceTableBody.innerHTML = ''; 
@@ -725,6 +722,7 @@ async function loadDashboardSummary() {
 
 if (document.title.includes("Login")) {
     // Attach event listeners for the login page elements immediately
+    // This is safe because these elements are guaranteed to exist on index.html
     loginBtn.addEventListener('click', handleLogin);
     registerBtn.addEventListener('click', handleRegister);
 }
