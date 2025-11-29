@@ -1,10 +1,10 @@
-// main.js - Final structural fix incorporating manual login redirect and DOM loading safety.
+// main.js - FINAL VERSION: Includes all authentication flow and DOM safety checks.
 
 // --- FIREBASE CONFIGURATION & INITIALIZATION ---
 
-// YOUR UNIQUE firebaseConfig OBJECT IS NOW PASTED HERE!
+// REPLACE THIS OBJECT WITH YOUR ACTUAL FIREBASE CONFIGURATION!
 const firebaseConfig = {
-    apiKey: "AIzaSyDt1nGhKNXz6bLfLILUfJ_RnfD45_VgVX0",
+    apiKey: "AIzaSyDt1nGhKNXz6bLfLILUfJ_RnfD45_VgVX0", // Example API Key - REPLACE THIS!
     authDomain: "scholarlink-sms-app.firebaseapp.com",
     projectId: "scholarlink-sms-app",
     storageBucket: "scholarlink-sms-app.firebasestorage.app",
@@ -14,7 +14,7 @@ const firebaseConfig = {
 };
 // --- END FIREBASE CONFIGURATION ---
 
-// Initialize Firebase using the simple method
+// Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 
 // Database and Authentication References
@@ -35,9 +35,10 @@ const SCHOOL_CLASSES = [
 ];
 
 // --- 1. DOM Element References ---
-const authStatusEl = document.getElementById('auth-status');
+// Check if elements exist on the current page before accessing them (Safer approach)
 
-// Auth/User Info (index.html)
+// Auth/User Info (index.html, app.html)
+const authStatusEl = document.getElementById('auth-status');
 const loginEmailEl = document.getElementById('loginEmail');
 const loginPasswordEl = document.getElementById('loginPassword');
 const loginBtn = document.getElementById('loginBtn');
@@ -90,7 +91,7 @@ const studentListBodyEl = document.getElementById('studentListBody');
 // --- 2. CORE UTILITY FUNCTIONS ---
 
 function updateStatus(message, type = 'info') {
-    if (authStatusEl) { // Check if the status element exists on the current page
+    if (authStatusEl) { 
         authStatusEl.textContent = message;
         const colors = {
             info: { bg: '#e0f7fa', text: '#01579b' },
@@ -103,11 +104,10 @@ function updateStatus(message, type = 'info') {
 }
 
 function populateClassDropdowns() {
-    // Collect all class dropdown elements that exist on the current page
     const classSelects = [attClassEl, gradeClassEl, lookupClassEl, newStudentClassEl].filter(el => el != null);
     
     classSelects.forEach(selectEl => {
-        selectEl.innerHTML = ''; // Clear existing options
+        selectEl.innerHTML = ''; 
         SCHOOL_CLASSES.forEach(className => {
             const option = document.createElement('option');
             option.value = className.replace(/\s/g, ''); 
@@ -118,8 +118,7 @@ function populateClassDropdowns() {
 }
 
 function switchModule(moduleId) {
-    // This logic only runs on app.html
-    if (!moduleSections || moduleSections.length === 0) return; // Safety check
+    if (!moduleSections || moduleSections.length === 0) return; 
 
     moduleSections.forEach(sec => sec.classList.remove('active'));
     document.getElementById(moduleId).classList.add('active');
@@ -141,9 +140,7 @@ function switchModule(moduleId) {
     updateStatus(`Module ready: ${moduleId}.`);
 }
 
-// --- 3. AUTHENTICATION LOGIC ---
-
-// Application Initialization Function (Runs only on the app.html page)
+// Application Initialization Function (Runs only on the app.html page AFTER load)
 function initializeApplicationLogic(user) {
     if (document.title.includes("Application")) {
         
@@ -163,20 +160,20 @@ function initializeApplicationLogic(user) {
         logoutBtn.addEventListener('click', handleLogout);
 
         // Attendance Module
-        loadStudentsBtn.addEventListener('click', handleLoadStudents);
-        saveAttendanceBtn.addEventListener('click', handleSaveAttendance);
+        if (loadStudentsBtn) loadStudentsBtn.addEventListener('click', handleLoadStudents);
+        if (saveAttendanceBtn) saveAttendanceBtn.addEventListener('click', handleSaveAttendance);
 
         // Gradebook Module
-        addGradeItemBtn.addEventListener('click', handleAddGradeItem);
-        loadGradeStudentsBtn.addEventListener('click', handleLoadGradeStudents);
-        saveGradesBtn.addEventListener('click', handleSaveGrades);
+        if (addGradeItemBtn) addGradeItemBtn.addEventListener('click', handleAddGradeItem);
+        if (loadGradeStudentsBtn) loadGradeStudentsBtn.addEventListener('click', handleLoadGradeStudents);
+        if (saveGradesBtn) saveGradesBtn.addEventListener('click', handleSaveGrades);
 
         // Parent Portal Module
-        lookupBtn.addEventListener('click', handleLookupRecords);
+        if (lookupBtn) lookupBtn.addEventListener('click', handleLookupRecords);
 
         // Headmaster Dashboard Management
-        addStudentBtn.addEventListener('click', handleAddStudent);
-        newStudentClassEl.addEventListener('change', loadStudentsByClass);
+        if (addStudentBtn) addStudentBtn.addEventListener('click', handleAddStudent);
+        if (newStudentClassEl) newStudentClassEl.addEventListener('change', loadStudentsByClass);
         
         // Start on the Attendance Module on load
         switchModule('attendance');
@@ -186,21 +183,16 @@ function initializeApplicationLogic(user) {
 
 // Primary listener that handles login/logout and initialization
 auth.onAuthStateChanged(user => {
-    // 1. If user is logged in:
     if (user) {
-        // [NO AUTOMATIC REDIRECT FROM LOGIN PAGE]
-
-        // If on the Application page (app.html):
+        // Logged In User Flow
         if (document.title.includes("Application")) {
-             // FIX: Wait for the *entire* page to load before initializing the visual components.
-             // This is the safety net against the blank screen.
+             // CRITICAL FIX: Ensure full page load before initializing UI logic
              window.addEventListener('load', () => initializeApplicationLogic(user));
         }
-    } 
-    // 2. If user is NOT logged in:
-    else {
-        // If on the Application page (app.html), redirect to the login page for security.
+    } else {
+        // Logged Out User Flow
         if (document.title.includes("Application")) {
+            // Security Check: Redirect unauthorized users back to login
             window.location.href = 'index.html';
         }
     }
@@ -219,7 +211,7 @@ async function handleRegister() {
     try {
         updateStatus('Creating new account...', 'info');
         await auth.createUserWithEmailAndPassword(email, password);
-        // On success, we perform an explicit redirect just like handleLogin
+        // Manual Redirect after successful registration
         window.location.href = 'app.html';
     } catch (error) {
         updateStatus(`Registration Error: ${error.message}`, 'error');
@@ -239,7 +231,7 @@ async function handleLogin() {
         updateStatus('Signing in...', 'info');
         await auth.signInWithEmailAndPassword(email, password);
         
-        // FIX: EXPLICIT REDIRECT ONLY AFTER MANUAL LOGIN SUCCESS
+        // Manual Redirect after successful login
         window.location.href = 'app.html'; 
         
     } catch (error) {
@@ -249,11 +241,11 @@ async function handleLogin() {
 
 function handleLogout() {
     auth.signOut();
-    // auth.onAuthStateChanged handles the redirection back to index.html
+    // Redirect handled by auth.onAuthStateChanged
 }
 
 
-// --- 4. ATTENDANCE LOGIC ---
+// --- 4. ATTENDANCE LOGIC (Simplified) ---
 
 function renderAttendanceTable(students) {
     attendanceTableBody.innerHTML = ''; 
@@ -269,7 +261,7 @@ function renderAttendanceTable(students) {
             </select>
         `;
     });
-    saveAttendanceBtn.disabled = students.length === 0;
+    if (saveAttendanceBtn) saveAttendanceBtn.disabled = students.length === 0;
 }
 
 
@@ -296,7 +288,7 @@ async function handleLoadStudents() {
         if (students.length === 0) {
             updateStatus(`No students found for ${selectedClass}. Please add students via the Dashboard.`, 'error');
             attendanceTableBody.innerHTML = '<tr><td colspan="2">No students found.</td></tr>';
-            saveAttendanceBtn.disabled = true;
+            if (saveAttendanceBtn) saveAttendanceBtn.disabled = true;
             return;
         }
 
@@ -347,7 +339,7 @@ async function handleSaveAttendance() {
 }
 
 
-// --- 5. GRADEBOOK LOGIC ---
+// --- 5. GRADEBOOK LOGIC (Simplified) ---
 
 async function handleAddGradeItem() {
     if (!auth.currentUser) return;
@@ -397,13 +389,12 @@ async function loadGradingItems() {
         
         snapshot.forEach(doc => {
             const item = doc.data();
-            // Removed: if (item.createdBy === auth.currentUser.email) { // We can let everyone see grading items for now
-                const option = document.createElement('option');
-                option.value = doc.id;
-                option.textContent = `${item.subject}: ${item.name} (Max: ${item.totalMarks})`;
-                option.dataset.max = item.totalMarks;
-                gradingItemSelectEl.appendChild(option);
-            // }
+            
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = `${item.subject}: ${item.name} (Max: ${item.totalMarks})`;
+            option.dataset.max = item.totalMarks;
+            gradingItemSelectEl.appendChild(option);
         });
         
         updateStatus(`Loaded ${gradingItemSelectEl.options.length - 1} grading items.`);
@@ -438,7 +429,7 @@ async function handleLoadGradeStudents() {
         if (students.length === 0) {
             updateStatus(`No students found for ${selectedClass}.`, 'error');
             gradesTableBody.innerHTML = '<tr><td colspan="2">No students found.</td></tr>';
-            saveGradesBtn.disabled = true;
+            if (saveGradesBtn) saveGradesBtn.disabled = true;
             return;
         }
         
@@ -452,7 +443,7 @@ async function handleLoadGradeStudents() {
             `;
         });
 
-        saveGradesBtn.disabled = students.length === 0;
+        if (saveGradesBtn) saveGradesBtn.disabled = students.length === 0;
         updateStatus(`Students loaded for ${selectedItem.textContent} (${selectedClass}). Enter scores.`);
         
     } catch (error) {
@@ -519,7 +510,7 @@ async function handleSaveGrades() {
 }
 
 
-// --- 6. PARENT PORTAL LOGIC ---
+// --- 6. PARENT PORTAL LOGIC (Simplified) ---
 
 async function handleLookupRecords() {
     if (!auth.currentUser) return;
@@ -606,7 +597,7 @@ async function handleLookupRecords() {
 }
 
 
-// --- 7. HEADMASTER DASHBOARD LOGIC ---
+// --- 7. HEADMASTER DASHBOARD LOGIC (Simplified) ---
 
 async function handleAddStudent() {
     if (!auth.currentUser) return;
@@ -668,7 +659,7 @@ async function loadDashboardSummary() {
 
     try {
         // A. Teachers Count (Placeholder/Estimate from Auth)
-        totalTeachersEl.textContent = '2+ (Based on current log-ins)';
+        if (totalTeachersEl) totalTeachersEl.textContent = '2+ (Based on current log-ins)';
 
         // B. Total Attendance Summary
         const attendanceSnapshot = await db.collection(ATTENDANCE_COLLECTION).get();
@@ -684,8 +675,8 @@ async function loadDashboardSummary() {
 
         const avgRate = totalStudentsMarked > 0 ? ((totalPresent / totalStudentsMarked) * 100).toFixed(1) : '0.0';
 
-        totalAttendanceDaysEl.textContent = totalDays;
-        avgAttendanceRateEl.textContent = `${avgRate}%`;
+        if (totalAttendanceDaysEl) totalAttendanceDaysEl.textContent = totalDays;
+        if (avgAttendanceRateEl) avgAttendanceRateEl.textContent = `${avgRate}%`;
 
 
         // C. Recent Grades (Last 5 Entries)
@@ -694,10 +685,10 @@ async function loadDashboardSummary() {
             .limit(5)
             .get();
 
-        recentGradesBodyEl.innerHTML = '';
-        if (gradesSnapshot.empty) {
+        if (recentGradesBodyEl) recentGradesBodyEl.innerHTML = '';
+        if (gradesSnapshot.empty && recentGradesBodyEl) {
             recentGradesBodyEl.innerHTML = '<tr><td colspan="4">No grades saved yet.</td></tr>';
-        } else {
+        } else if (recentGradesBodyEl) {
             gradesSnapshot.forEach(doc => {
                 const data = doc.data();
                 const row = recentGradesBodyEl.insertRow();
@@ -721,6 +712,6 @@ async function loadDashboardSummary() {
 
 if (document.title.includes("Login")) {
     // Attach event listeners for the login page elements immediately
-    loginBtn.addEventListener('click', handleLogin);
-    registerBtn.addEventListener('click', handleRegister);
+    if (loginBtn) loginBtn.addEventListener('click', handleLogin);
+    if (registerBtn) registerBtn.addEventListener('click', handleRegister);
 }
