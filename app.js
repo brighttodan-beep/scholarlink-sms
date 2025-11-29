@@ -1,5 +1,27 @@
 // app.js - Main logic for ScholarLink SMS
 
+// --- FIREBASE CONFIGURATION & INITIALIZATION ---
+
+// YOUR UNIQUE firebaseConfig OBJECT IS NOW PASTED HERE!
+const firebaseConfig = {
+    apiKey: "AIzaSyDt1nGhKNXz6bLfLILUfJ_RnfD45_VgVX0",
+    authDomain: "scholarlink-sms-app.firebaseapp.com",
+    projectId: "scholarlink-sms-app",
+    storageBucket: "scholarlink-sms-app.firebasestorage.app",
+    messagingSenderId: "866758277016",
+    appId: "1:866758277016:web:c848393d8a0cce4ea5dded",
+    measurementId: "G-NLKTVVVQGZ"
+};
+// --- END FIREBASE CONFIGURATION ---
+
+// Initialize Firebase (We use the simple older syntax for compatibility)
+firebase.initializeApp(firebaseConfig);
+
+// Database and Authentication References
+const db = firebase.firestore();
+const auth = firebase.auth();
+const ATTENDANCE_COLLECTION = "attendanceRecords";
+
 // --- 1. DOM Element References ---
 const statusEl = document.getElementById('app-status');
 const tabBtns = document.querySelectorAll('.tab-btn');
@@ -42,9 +64,9 @@ function switchModule(moduleId) {
     updateStatus(`Switched to the ${moduleId} module.`);
 }
 
-// --- 3. ATTENDANCE LOGIC (Currently local placeholders) ---
+// --- 3. ATTENDANCE LOGIC (Cloud Integration) ---
 
-// Dummy data for testing before Cloud Storage is added
+// Dummy data for testing (will be replaced by Firebase query later)
 const DUMMY_STUDENTS = [
     "Kwame Nkrumah",
     "Yaa Asantewaa",
@@ -54,7 +76,7 @@ const DUMMY_STUDENTS = [
 ];
 
 function renderAttendanceTable(students) {
-    tableBody.innerHTML = ''; // Clear existing rows
+    tableBody.innerHTML = ''; 
     students.forEach((student) => {
         const row = tableBody.insertRow();
         
@@ -83,32 +105,48 @@ function handleLoadStudents() {
         return;
     }
 
-    // This simulates loading data for the selected class
     updateStatus(`Loading students for ${selectedClass} on ${selectedDate}...`);
     
-    // Use dummy data for now
+    // Using dummy data for now
     renderAttendanceTable(DUMMY_STUDENTS);
 
     updateStatus(`5 students loaded for ${selectedClass}. Mark attendance.`);
 }
 
-
-function handleSaveAttendance() {
-    updateStatus('Saving attendance records locally...', 'info');
-    
-    // This function will be replaced with Firebase Cloud Storage logic later.
-    
-    // Simulate reading the data
+async function handleSaveAttendance() {
+    const selectedClass = attClassEl.value;
+    const selectedDate = attDateEl.value;
     const records = [];
+    
     tableBody.querySelectorAll('tr').forEach(row => {
         const name = row.cells[0].textContent;
         const status = row.cells[1].querySelector('.status-select').value;
         records.push({ name, status });
     });
-
-    console.log("Attendance Saved:", records);
     
-    updateStatus(`SUCCESS! ${records.length} attendance records saved. Cloud setup is next!`, 'success');
+    if (records.length === 0) {
+        updateStatus("Nothing to save.", 'error');
+        return;
+    }
+
+    updateStatus('Saving attendance records to the Cloud...', 'info');
+    
+    try {
+        // Create a unique ID for the document (e.g., JHS3_2025-11-29)
+        const docId = `${selectedClass}_${selectedDate}`;
+        
+        await db.collection(ATTENDANCE_COLLECTION).doc(docId).set({
+            class: selectedClass,
+            date: selectedDate,
+            records: records,
+            savedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        updateStatus(`SUCCESS! ${records.length} records saved to Firebase.`, 'success');
+    } catch (error) {
+        console.error("Firebase Save Error:", error);
+        updateStatus(`ERROR! Failed to save to Cloud. See console.`, 'error');
+    }
 }
 
 // --- 4. EVENT LISTENERS & INITIAL SETUP ---
