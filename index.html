@@ -68,8 +68,62 @@
                 <button id="saveAttendanceBtn" class="primary-btn" disabled>Save Attendance</button>
             </div>
 
-            <div id="grade" class="module-section"><h2>Gradebook Module</h2><p>Development starting soon...</p></div>
+            <div id="grade" class="module-section">
+                <h2>Record Test/Assignment Marks</h2>
+
+                <div id="add-grading-item">
+                    <h3>1. Create New Grading Item</h3>
+                    <label for="gradeSubject">Subject:</label>
+                    <select id="gradeSubject">
+                        <option value="Maths">Mathematics</option>
+                        <option value="English">English Language</option>
+                        <option value="Science">Integrated Science</option>
+                        <option value="RME">RME</option>
+                    </select>
+
+                    <label for="gradeItemName">Test/Assignment Name:</label>
+                    <input type="text" id="gradeItemName" placeholder="e.g., Mid-Term Exam">
+
+                    <label for="totalMarks">Total Marks (Score out of):</label>
+                    <input type="number" id="totalMarks" placeholder="e.g., 50">
+
+                    <button id="addGradeItemBtn" class="secondary-btn" style="width:auto; margin-top:20px;">Add Grading Item</button>
+                </div>
+
+                <div id="enter-marks" style="margin-top: 30px;">
+                    <h3>2. Enter Marks for Students</h3>
+                    <label for="gradingItemSelect">Select Grading Item:</label>
+                    <select id="gradingItemSelect">
+                        <option value="">Load an item first...</option>
+                    </select>
+                    
+                    <label for="gradeClass">Select Class:</label>
+                    <select id="gradeClass">
+                        <option value="JHS3">JHS 3</option>
+                        <option value="JHS2">JHS 2</option>
+                        <option value="P6">Primary 6</option>
+                        <option value="P5">Primary 5</option>
+                    </select>
+
+                    <button id="loadGradeStudentsBtn" class="secondary-btn">Load Students for Marks</button>
+                </div>
+                
+                <table id="gradesTable" style="margin-top: 20px;">
+                    <thead>
+                        <tr>
+                            <th>Student Name</th>
+                            <th>Score (out of max)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="gradesTableBody">
+                        </tbody>
+                </table>
+                <button id="saveGradesBtn" class="primary-btn" disabled>Save Grades</button>
+
+            </div>
+
             <div id="parent-portal" class="module-section"><h2>Parent Portal</h2><p>Development starting soon...</p></div>
+            
             <div id="headmaster-dashboard" class="module-section"><h2>Headmaster Dashboard</h2><p>Development starting soon...</p></div>
         </div>
     </div>
