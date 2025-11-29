@@ -87,7 +87,7 @@ const totalAttendanceDaysEl = document.getElementById('totalAttendanceDays');
 const avgAttendanceRateEl = document.getElementById('avgAttendanceRate');
 const recentGradesBodyEl = document.getElementById('recentGradesBody');
 
-// Student Management (for Headmaster Dashboard) (NEW)
+// Student Management (for Headmaster Dashboard)
 const newStudentNameEl = document.getElementById('newStudentName');
 const newStudentClassEl = document.getElementById('newStudentClass');
 const addStudentBtn = document.getElementById('addStudentBtn');
@@ -134,6 +134,11 @@ function switchModule(moduleId) {
         }
     });
     
+    // --- UNIVERSAL SCROLL FIX APPLIED HERE ---
+    // Scrolls the entire window to the top (coordinate 0, 0)
+    window.scrollTo({ top: 0, behavior: 'smooth' }); 
+    // --- END SCROLL FIX ---
+
     if (moduleId === 'grade') {
         loadGradingItems();
     } else if (moduleId === 'headmaster-dashboard') {
@@ -302,7 +307,7 @@ async function handleSaveAttendance() {
 }
 
 
-// --- 5. GRADEBOOK LOGIC (UNCHANGED) ---
+// --- 5. GRADEBOOK LOGIC ---
 
 async function handleAddGradeItem() {
     if (!auth.currentUser) {
@@ -709,7 +714,7 @@ saveGradesBtn.addEventListener('click', handleSaveGrades);
 // Parent Portal Module
 lookupBtn.addEventListener('click', handleLookupRecords);
 
-// Headmaster Dashboard Management (NEW)
+// Headmaster Dashboard Management
 addStudentBtn.addEventListener('click', handleAddStudent);
 newStudentClassEl.addEventListener('change', loadStudentsByClass);
 
