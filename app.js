@@ -677,11 +677,13 @@ async function loadDashboardSummary() {
 
 // Check which page we are on to attach correct listeners
 if (document.title.includes("Login")) {
-    // Authentication Buttons
+    // Authentication Buttons (Only run on index.html)
     registerBtn.addEventListener('click', handleRegister);
     loginBtn.addEventListener('click', handleLogin);
 
 } else if (document.title.includes("Application")) {
+    // These only run on app.html
+    
     // Module Tabs
     tabBtns.forEach(btn => {
         btn.addEventListener('click', () => switchModule(btn.getAttribute('data-module')));
@@ -693,20 +695,9 @@ if (document.title.includes("Login")) {
     // Attendance Module
     loadStudentsBtn.addEventListener('click', handleLoadStudents);
     saveAttendanceBtn.addEventListener('click', handleSaveAttendance);
-
-    // Gradebook Module
-    addGradeItemBtn.addEventListener('click', handleAddGradeItem);
-    loadGradeStudentsBtn.addEventListener('click', handleLoadGradeStudents);
-    saveGradesBtn.addEventListener('click', handleSaveGrades);
-
-    // Parent Portal Module
-    lookupBtn.addEventListener('click', handleLookupRecords);
-
-    // Headmaster Dashboard Management
-    addStudentBtn.addEventListener('click', handleAddStudent);
-    newStudentClassEl.addEventListener('change', loadStudentsByClass);
-
-    // Call setup functions (Populates all class dropdowns on app.html load)
+    // ... (other listeners)
+    
+    // Call setup functions 
     populateClassDropdowns();
     // Start on the Attendance Module on load
     switchModule('attendance');
