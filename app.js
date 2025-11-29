@@ -1,4 +1,4 @@
-// main.js - Main logic for ScholarLink SMS
+// main.js - Main logic for ScholarLink SMS (now supporting Multi-Page Architecture)
 
 // --- FIREBASE CONFIGURATION & INITIALIZATION ---
 
@@ -22,37 +22,32 @@ const db = firebase.firestore();
 const auth = firebase.auth();
 
 // FIREBASE COLLECTION NAMES
-const STUDENTS_COLLECTION = "students"; // NEW COLLECTION
+const STUDENTS_COLLECTION = "students";
 const ATTENDANCE_COLLECTION = "attendanceRecords";
 const GRADING_ITEM_COLLECTION = "gradingItems";
 const GRADES_COLLECTION = "grades";
 
 
 // --- CONFIGURABLE SYSTEM VARIABLES ---
-// Updated Class List per user request
 const SCHOOL_CLASSES = [
     "K1", "K2", "P1", "P2", "P3", "P4", "P5", "P6", 
     "JHS1", "JHS2", "JHS3", "SHS1", "SHS2", "SHS3"
 ];
 
-// DUMMY_STUDENTS array REMOVED to enforce manual entry
-
 // --- 1. DOM Element References ---
 const authStatusEl = document.getElementById('auth-status');
-const authScreenEl = document.getElementById('auth-screen');
-const mainAppScreenEl = document.getElementById('main-app-screen');
 
-// Auth/User Info
+// Auth/User Info (only needed on index.html)
 const loginEmailEl = document.getElementById('loginEmail');
 const loginPasswordEl = document.getElementById('loginPassword');
 const loginBtn = document.getElementById('loginBtn');
 const registerBtn = document.getElementById('registerBtn');
+
+// Main App Elements (only needed on app.html)
 const logoutBtn = document.getElementById('logoutBtn');
 const userNameEl = document.getElementById('userName');
-
-// Main App Elements
 const tabBtns = document.querySelectorAll('.tab-btn');
-const moduleSections = document.querySelectorAll('.module-section');
+const moduleSections = document.querySelectorAll('.module-section'); // Used for module switching within app.html
 
 // Attendance Module References
 const attClassEl = document.getElementById('attClass');
@@ -86,8 +81,6 @@ const totalTeachersEl = document.getElementById('totalTeachers');
 const totalAttendanceDaysEl = document.getElementById('totalAttendanceDays');
 const avgAttendanceRateEl = document.getElementById('avgAttendanceRate');
 const recentGradesBodyEl = document.getElementById('recentGradesBody');
-
-// Student Management (for Headmaster Dashboard)
 const newStudentNameEl = document.getElementById('newStudentName');
 const newStudentClassEl = document.getElementById('newStudentClass');
 const addStudentBtn = document.getElementById('addStudentBtn');
@@ -97,25 +90,26 @@ const studentListBodyEl = document.getElementById('studentListBody');
 // --- 2. CORE UTILITY FUNCTIONS ---
 
 function updateStatus(message, type = 'info') {
-    authStatusEl.textContent = message;
-    const colors = {
-        info: { bg: '#e0f7fa', text: '#01579b' },
-        success: { bg: '#d4edda', text: '#155724' },
-        error: { bg: '#f8d7da', text: '#721c24' }
-    };
-    authStatusEl.style.background = colors[type].bg;
-    authStatusEl.style.color = colors[type].text;
+    if (authStatusEl) { // Check if the status element exists on this page
+        authStatusEl.textContent = message;
+        const colors = {
+            info: { bg: '#e0f7fa', text: '#01579b' },
+            success: { bg: '#d4edda', text: '#155724' },
+            error: { bg: '#f8d7da', text: '#721c24' }
+        };
+        authStatusEl.style.background = colors[type].bg;
+        authStatusEl.style.color = colors[type].text;
+    }
 }
 
 function populateClassDropdowns() {
-    // Collect all class dropdown elements
-    const classSelects = [attClassEl, gradeClassEl, lookupClassEl, newStudentClassEl];
+    // Collect all class dropdown elements that exist on the current page
+    const classSelects = [attClassEl, gradeClassEl, lookupClassEl, newStudentClassEl].filter(el => el != null);
     
     classSelects.forEach(selectEl => {
         selectEl.innerHTML = ''; // Clear existing options
         SCHOOL_CLASSES.forEach(className => {
             const option = document.createElement('option');
-            // Use value without spaces for cleaner database IDs/keys
             option.value = className.replace(/\s/g, ''); 
             option.textContent = className;
             selectEl.appendChild(option);
@@ -124,6 +118,7 @@ function populateClassDropdowns() {
 }
 
 function switchModule(moduleId) {
+    // This logic only runs on app.html
     moduleSections.forEach(sec => sec.classList.remove('active'));
     document.getElementById(moduleId).classList.add('active');
 
@@ -134,16 +129,13 @@ function switchModule(moduleId) {
         }
     });
     
-    // --- UNIVERSAL SCROLL FIX APPLIED HERE ---
-    // Scrolls the entire window to the top (coordinate 0, 0)
-    window.scrollTo({ top: 0, behavior: 'smooth' }); 
-    // --- END SCROLL FIX ---
-
+    // Auto-scroll is no longer needed since we are using separate pages, 
+    // but the SPA logic for module switching is kept for the app.html view
+    
     if (moduleId === 'grade') {
         loadGradingItems();
     } else if (moduleId === 'headmaster-dashboard') {
         loadDashboardSummary(); 
-        // Load student list when dashboard is active (for management)
         loadStudentsByClass();
     }
     
@@ -153,16 +145,24 @@ function switchModule(moduleId) {
 // --- 3. AUTHENTICATION LOGIC ---
 
 auth.onAuthStateChanged(user => {
+    // 1. If user is logged in:
     if (user) {
-        authScreenEl.classList.remove('active');
-        mainAppScreenEl.classList.add('active');
-        userNameEl.textContent = user.email;
-        updateStatus(`Welcome back, ${user.email}!`, 'success');
-        switchModule('attendance');
-    } else {
-        authScreenEl.classList.add('active');
-        mainAppScreenEl.classList.remove('active');
-        updateStatus('Please sign in to access the system.', 'info');
+        // If the user is on the login page (index.html), redirect to the app page.
+        if (document.title.includes("Login")) {
+            window.location.href = 'app.html';
+        } 
+        // If the user is on the app page (app.html), populate user info.
+        else if (document.title.includes("Application")) {
+            userNameEl.textContent = user.email;
+            updateStatus(`Welcome back, ${user.email}!`, 'success');
+        }
+    } 
+    // 2. If user is NOT logged in:
+    else {
+        // If the user is on the app page (app.html), redirect to the login page.
+        if (document.title.includes("Application")) {
+            window.location.href = 'index.html';
+        }
     }
 });
 
@@ -179,6 +179,7 @@ async function handleRegister() {
     try {
         updateStatus('Creating new account...', 'info');
         await auth.createUserWithEmailAndPassword(email, password);
+        // auth.onAuthStateChanged will handle the redirection on success
     } catch (error) {
         updateStatus(`Registration Error: ${error.message}`, 'error');
     }
@@ -196,6 +197,7 @@ async function handleLogin() {
     try {
         updateStatus('Signing in...', 'info');
         await auth.signInWithEmailAndPassword(email, password);
+        // auth.onAuthStateChanged will handle the redirection on success
     } catch (error) {
         updateStatus(`Login Error: ${error.message}`, 'error');
     }
@@ -203,7 +205,7 @@ async function handleLogin() {
 
 function handleLogout() {
     auth.signOut();
-    updateStatus('You have been signed out.', 'info');
+    // auth.onAuthStateChanged will handle the redirection back to index.html
 }
 
 
@@ -228,10 +230,7 @@ function renderAttendanceTable(students) {
 
 
 async function handleLoadStudents() {
-    if (!auth.currentUser) {
-        updateStatus("Error: Please log in to load data.", 'error');
-        return;
-    }
+    if (!auth.currentUser) return;
     const selectedClass = attClassEl.value;
     const selectedDate = attDateEl.value;
 
@@ -266,10 +265,7 @@ async function handleLoadStudents() {
 }
 
 async function handleSaveAttendance() {
-    if (!auth.currentUser) {
-        updateStatus("Security Error: You must be logged in to save data.", 'error');
-        return;
-    }
+    if (!auth.currentUser) return;
 
     const selectedClass = attClassEl.value;
     const selectedDate = attDateEl.value;
@@ -310,10 +306,7 @@ async function handleSaveAttendance() {
 // --- 5. GRADEBOOK LOGIC ---
 
 async function handleAddGradeItem() {
-    if (!auth.currentUser) {
-        updateStatus("Security Error: You must be logged in to add a grading item.", 'error');
-        return;
-    }
+    if (!auth.currentUser) return;
     
     const subject = gradeSubjectEl.value;
     const itemName = gradeItemNameEl.value.trim();
@@ -376,10 +369,7 @@ async function loadGradingItems() {
 }
 
 async function handleLoadGradeStudents() {
-     if (!auth.currentUser) {
-        updateStatus("Error: Please log in to load data.", 'error');
-        return;
-    }
+     if (!auth.currentUser) return;
     
     const selectedItem = gradingItemSelectEl.options[gradingItemSelectEl.selectedIndex];
     
@@ -428,10 +418,7 @@ async function handleLoadGradeStudents() {
 
 
 async function handleSaveGrades() {
-    if (!auth.currentUser) {
-        updateStatus("Security Error: You must be logged in to save grades.", 'error');
-        return;
-    }
+    if (!auth.currentUser) return;
 
     const selectedItem = gradingItemSelectEl.options[gradingItemSelectEl.selectedIndex];
     
@@ -488,13 +475,10 @@ async function handleSaveGrades() {
 }
 
 
-// --- 6. PARENT PORTAL LOGIC (UNCHANGED) ---
+// --- 6. PARENT PORTAL LOGIC ---
 
 async function handleLookupRecords() {
-    if (!auth.currentUser) {
-        updateStatus("Error: Please log in to view data.", 'error');
-        return;
-    }
+    if (!auth.currentUser) return;
     
     const lookupName = lookupNameEl.value.trim();
     const lookupClass = lookupClassEl.value;
@@ -580,9 +564,8 @@ async function handleLookupRecords() {
 
 // --- 7. HEADMASTER DASHBOARD LOGIC (Includes Student Management) ---
 
-// ** NEW FUNCTIONALITY **
 async function handleAddStudent() {
-    if (!auth.currentUser) return updateStatus("Security Error: Must be logged in.", 'error');
+    if (!auth.currentUser) return;
     
     const name = newStudentNameEl.value.trim();
     const classValue = newStudentClassEl.value;
@@ -692,31 +675,39 @@ async function loadDashboardSummary() {
 
 // --- 8. EVENT LISTENERS & INITIAL SETUP ---
 
-// Authentication Buttons
-registerBtn.addEventListener('click', handleRegister);
-loginBtn.addEventListener('click', handleLogin);
-logoutBtn.addEventListener('click', handleLogout);
+// Check which page we are on to attach correct listeners
+if (document.title.includes("Login")) {
+    // Authentication Buttons
+    registerBtn.addEventListener('click', handleRegister);
+    loginBtn.addEventListener('click', handleLogin);
 
-// Module Tabs
-tabBtns.forEach(btn => {
-    btn.addEventListener('click', () => switchModule(btn.getAttribute('data-module')));
-});
+} else if (document.title.includes("Application")) {
+    // Module Tabs
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => switchModule(btn.getAttribute('data-module')));
+    });
 
-// Attendance Module
-loadStudentsBtn.addEventListener('click', handleLoadStudents);
-saveAttendanceBtn.addEventListener('click', handleSaveAttendance);
+    // Logout Button
+    logoutBtn.addEventListener('click', handleLogout);
 
-// Gradebook Module
-addGradeItemBtn.addEventListener('click', handleAddGradeItem);
-loadGradeStudentsBtn.addEventListener('click', handleLoadGradeStudents);
-saveGradesBtn.addEventListener('click', handleSaveGrades);
+    // Attendance Module
+    loadStudentsBtn.addEventListener('click', handleLoadStudents);
+    saveAttendanceBtn.addEventListener('click', handleSaveAttendance);
 
-// Parent Portal Module
-lookupBtn.addEventListener('click', handleLookupRecords);
+    // Gradebook Module
+    addGradeItemBtn.addEventListener('click', handleAddGradeItem);
+    loadGradeStudentsBtn.addEventListener('click', handleLoadGradeStudents);
+    saveGradesBtn.addEventListener('click', handleSaveGrades);
 
-// Headmaster Dashboard Management
-addStudentBtn.addEventListener('click', handleAddStudent);
-newStudentClassEl.addEventListener('change', loadStudentsByClass);
+    // Parent Portal Module
+    lookupBtn.addEventListener('click', handleLookupRecords);
 
-// Call setup functions (Populates all class dropdowns on load)
-populateClassDropdowns();
+    // Headmaster Dashboard Management
+    addStudentBtn.addEventListener('click', handleAddStudent);
+    newStudentClassEl.addEventListener('change', loadStudentsByClass);
+
+    // Call setup functions (Populates all class dropdowns on app.html load)
+    populateClassDropdowns();
+    // Start on the Attendance Module on load
+    switchModule('attendance');
+}
