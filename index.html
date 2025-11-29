@@ -3,221 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ScholarLink SMS - School Management System</title>
+    <title>ScholarLink SMS - Login</title>
     <link rel="stylesheet" href="style.css">
     
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 </head>
 <body>
-    <div class="container">
-        <h1>ScholarLink SMS</h1>
-        <div id="auth-status" class="status">Initializing...</div>
-
-        <div id="auth-screen" class="screen active">
-            <h2>Staff Login</h2>
-            <div class="auth-group">
-                <label for="loginEmail">Email:</label>
-                <input type="email" id="loginEmail" placeholder="teacher@school.edu">
-                <label for="loginPassword">Password:</label>
-                <input type="password" id="loginPassword" placeholder="******">
-            </div>
-            
-            <button id="loginBtn" class="primary-btn">Sign In</button>
-            <button id="registerBtn" class="secondary-btn">Register New Teacher</button>
-        </div>
-
-        <div id="main-app-screen" class="screen">
-            <div class="user-info">
-                Welcome, <span id="userName">User!</span> | <button id="logoutBtn" class="logout-btn">Sign Out</button>
-            </div>
-            
-            <div class="tabs">
-                <button class="tab-btn active" data-module="attendance">Attendance</button>
-                <button class="tab-btn" data-module="grade">Gradebook</button>
-                <button class="tab-btn" data-module="parent-portal">Parent Portal</button>
-                <button class="tab-btn" data-module="headmaster-dashboard">Dashboard</button>
-            </div>
-
-            <div id="attendance" class="module-section active">
-                <h2>Attendance Marking</h2>
-                <div class="input-group">
-                    <label for="attClass">Select Class:</label>
-                    <select id="attClass">
-                        <option value="JHS3">JHS 3</option>
-                        <option value="JHS2">JHS 2</option>
-                        <option value="P6">Primary 6</option>
-                        <option value="P5">Primary 5</option>
-                    </select>
-                    <label for="attDate">Date:</label>
-                    <input type="date" id="attDate">
-                    <button id="loadStudentsBtn" class="secondary-btn">Load Students</button>
-                </div>
-
-                <table id="attendanceTable">
-                    <thead>
-                        <tr>
-                            <th>Student Name</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody id="attendanceTableBody">
-                        </tbody>
-                </table>
-                <button id="saveAttendanceBtn" class="primary-btn" disabled>Save Attendance</button>
-            </div>
-
-            <div id="grade" class="module-section">
-                <h2>Record Test/Assignment Marks</h2>
-
-                <div id="add-grading-item">
-                    <h3>1. Create New Grading Item</h3>
-                    <label for="gradeSubject">Subject:</label>
-                    <select id="gradeSubject">
-                        <option value="Maths">Mathematics</option>
-                        <option value="English">English Language</option>
-                        <option value="Science">Integrated Science</option>
-                        <option value="RME">RME</option>
-                    </select>
-
-                    <label for="gradeItemName">Test/Assignment Name:</label>
-                    <input type="text" id="gradeItemName" placeholder="e.g., Mid-Term Exam">
-
-                    <label for="totalMarks">Total Marks (Score out of):</label>
-                    <input type="number" id="totalMarks" placeholder="e.g., 50">
-
-                    <button id="addGradeItemBtn" class="secondary-btn" style="width:auto; margin-top:20px;">Add Grading Item</button>
-                </div>
-
-                <div id="enter-marks" style="margin-top: 30px;">
-                    <h3>2. Enter Marks for Students</h3>
-                    <label for="gradingItemSelect">Select Grading Item:</label>
-                    <select id="gradingItemSelect">
-                        <option value="">Load an item first...</option>
-                    </select>
-                    
-                    <label for="gradeClass">Select Class:</label>
-                    <select id="gradeClass">
-                        <option value="JHS3">JHS 3</option>
-                        <option value="JHS2">JHS 2</option>
-                        <option value="P6">Primary 6</option>
-                        <option value="P5">Primary 5</option>
-                    </select>
-
-                    <button id="loadGradeStudentsBtn" class="secondary-btn">Load Students for Marks</button>
-                </div>
-                
-                <table id="gradesTable" style="margin-top: 20px;">
-                    <thead>
-                        <tr>
-                            <th>Student Name</th>
-                            <th>Score (out of max)</th>
-                        </tr>
-                    </thead>
-                    <tbody id="gradesTableBody">
-                        </tbody>
-                </table>
-                <button id="saveGradesBtn" class="primary-btn" disabled>Save Grades</button>
-
-            </div>
-
-            <div id="parent-portal" class="module-section">
-                <h2>Student Record Lookup</h2>
-                <div class="input-group">
-                    <label for="lookupName">Student Full Name:</label>
-                    <input type="text" id="lookupName" placeholder="e.g., Ama Ghana">
-                    
-                    <label for="lookupClass">Select Class:</label>
-                    <select id="lookupClass">
-                        <option value="JHS3">JHS 3</option>
-                        <option value="JHS2">JHS 2</option>
-                        <option value="P6">Primary 6</option>
-                        <option value="P5">Primary 5</option>
-                    </select>
-                    
-                    <button id="lookupBtn" class="primary-btn">View Student Records</button>
-                </div>
-
-                <div id="records-display" style="margin-top: 20px;">
-                    <h3>Records for: <span id="studentNameDisplay"></span></h3>
-                    
-                    <h4>Attendance Summary</h4>
-                    <ul id="attendanceSummary"></ul>
-                    
-                    <h4>Gradebook Summary</h4>
-                    <table id="gradesSummaryTable">
-                        <thead>
-                            <tr>
-                                <th>Test/Assignment</th>
-                                <th>Score</th>
-                                <th>Max</th>
-                            </tr>
-                        </thead>
-                        <tbody id="gradesSummaryBody">
-                            </tbody>
-                    </table>
-                </div>
-            </div>
-            
-            <div id="headmaster-dashboard" class="module-section">
-    <h2>Headmaster Dashboard: School Summary</h2>
-    <div class="summary-cards">
-        <div class="card">
-            <h3>Total Teachers</h3>
-            <p id="totalTeachers">Loading...</p>
-        </div>
-        <div class="card">
-            <h3>Attendance Days Logged</h3>
-            <p id="totalAttendanceDays">Loading...</p>
-        </div>
-        <div class="card">
-            <h3>Average Attendance Rate</h3>
-            <p id="avgAttendanceRate">Loading...</p>
-        </div>
-    </div>
-
-    <div style="margin-top: 30px;">
-        <h3>Student Management</h3>
-        <div class="input-group">
-            <label for="newStudentName">Student Full Name:</label>
-            <input type="text" id="newStudentName" placeholder="e.g., Ama Ghana">
-            
-            <label for="newStudentClass">Class:</label>
-            <select id="newStudentClass"></select>
-            
-            <button id="addStudentBtn" class="primary-btn">Add New Student</button>
-        </div>
-        
-        <h4>Students in Selected Class:</h4>
-        <table>
-            <thead>
-                <tr>
-                    <th>Student Name</th>
-                    <th>Class</th>
-                </tr>
-            </thead>
-            <tbody id="studentListBody">
-                </tbody>
-        </table>
-    </div>
-    <h3 style="margin-top: 30px;">Recent Grades Entered</h3>
-    <table id="recentGradesTable">
-        <thead>
-            <tr>
-                <th>Test/Assignment</th>
-                <th>Class</th>
-                <th>Students Marked</th>
-                <th>Entered By</th>
-            </tr>
-        </thead>
-        <tbody id="recentGradesBody">
-            </tbody>
-    </table>
-</div>
     
-    <script src="app.js"></script>
+    <div id="auth-screen" class="active">
+        <h2>ScholarLink SMS Login</h2>
+        <div id="auth-status" class="status">Please sign in to access the system.</div>
+        
+        <div class="auth-group">
+            <label for="loginEmail">Email:</label>
+            <input type="email" id="loginEmail" placeholder="teacher@school.com" required>
+        </div>
+        <div class="auth-group">
+            <label for="loginPassword">Password:</label>
+            <input type="password" id="loginPassword" required>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+            <button id="loginBtn" class="primary-btn" style="flex-grow: 1; margin-right: 10px;">Log In</button>
+            <button id="registerBtn" class="secondary-btn" style="flex-grow: 1;">Register (First Time)</button>
+        </div>
+    </div>
+    
+    <script src="main.js"></script>
 </body>
 </html>
-
-
