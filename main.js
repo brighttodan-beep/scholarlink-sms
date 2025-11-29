@@ -1,4 +1,4 @@
-// main.js - Final structural fix incorporating Firebase-controlled initialization and manual login redirect.
+// main.js - Final structural fix incorporating manual login redirect and DOM loading safety.
 
 // --- FIREBASE CONFIGURATION & INITIALIZATION ---
 
@@ -188,17 +188,18 @@ function initializeApplicationLogic(user) {
 auth.onAuthStateChanged(user => {
     // 1. If user is logged in:
     if (user) {
-        // [LOGIN PAGE REDIRECT LOGIC REMOVED: Login page will stay on screen until button is clicked]
+        // [NO AUTOMATIC REDIRECT FROM LOGIN PAGE]
 
         // If on the Application page (app.html):
         if (document.title.includes("Application")) {
              // FIX: Wait for the *entire* page to load before initializing the visual components.
+             // This is the safety net against the blank screen.
              window.addEventListener('load', () => initializeApplicationLogic(user));
         }
     } 
     // 2. If user is NOT logged in:
     else {
-        // If on the Application page (app.html), redirect to the login page.
+        // If on the Application page (app.html), redirect to the login page for security.
         if (document.title.includes("Application")) {
             window.location.href = 'index.html';
         }
