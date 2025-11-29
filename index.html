@@ -177,6 +177,30 @@
         </div>
     </div>
 
+    <div style="margin-top: 30px;">
+        <h3>Student Management</h3>
+        <div class="input-group">
+            <label for="newStudentName">Student Full Name:</label>
+            <input type="text" id="newStudentName" placeholder="e.g., Ama Ghana">
+            
+            <label for="newStudentClass">Class:</label>
+            <select id="newStudentClass"></select>
+            
+            <button id="addStudentBtn" class="primary-btn">Add New Student</button>
+        </div>
+        
+        <h4>Students in Selected Class:</h4>
+        <table>
+            <thead>
+                <tr>
+                    <th>Student Name</th>
+                    <th>Class</th>
+                </tr>
+            </thead>
+            <tbody id="studentListBody">
+                </tbody>
+        </table>
+    </div>
     <h3 style="margin-top: 30px;">Recent Grades Entered</h3>
     <table id="recentGradesTable">
         <thead>
@@ -195,4 +219,5 @@
     <script src="app.js"></script>
 </body>
 </html>
+
 
