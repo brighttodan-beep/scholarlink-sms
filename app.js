@@ -20,14 +20,19 @@ firebase.initializeApp(firebaseConfig);
 // Database and Authentication References
 const db = firebase.firestore();
 const auth = firebase.auth();
+
+// FIREBASE COLLECTION NAMES
 const ATTENDANCE_COLLECTION = "attendanceRecords";
+const GRADING_ITEM_COLLECTION = "gradingItems"; // NEW COLLECTION
+const GRADES_COLLECTION = "grades"; // NEW COLLECTION
+
 
 // --- 1. DOM Element References ---
-const authStatusEl = document.getElementById('auth-status'); // Status bar for login
-const authScreenEl = document.getElementById('auth-screen'); // Login form container
-const mainAppScreenEl = document.getElementById('main-app-screen'); // Main app container
+const authStatusEl = document.getElementById('auth-status');
+const authScreenEl = document.getElementById('auth-screen');
+const mainAppScreenEl = document.getElementById('main-app-screen');
 
-// Login/Register Inputs
+// Auth/User Info
 const loginEmailEl = document.getElementById('loginEmail');
 const loginPasswordEl = document.getElementById('loginPassword');
 const loginBtn = document.getElementById('loginBtn');
@@ -44,13 +49,25 @@ const attClassEl = document.getElementById('attClass');
 const attDateEl = document.getElementById('attDate');
 const loadStudentsBtn = document.getElementById('loadStudentsBtn');
 const saveAttendanceBtn = document.getElementById('saveAttendanceBtn');
-const tableBody = document.getElementById('attendanceTableBody');
+const attendanceTableBody = document.getElementById('attendanceTableBody'); // Renamed for clarity
+
+// Gradebook Module References (NEW)
+const gradeSubjectEl = document.getElementById('gradeSubject');
+const gradeItemNameEl = document.getElementById('gradeItemName');
+const totalMarksEl = document.getElementById('totalMarks');
+const addGradeItemBtn = document.getElementById('addGradeItemBtn');
+
+const gradingItemSelectEl = document.getElementById('gradingItemSelect');
+const gradeClassEl = document.getElementById('gradeClass');
+const loadGradeStudentsBtn = document.getElementById('loadGradeStudentsBtn');
+const gradesTableBody = document.getElementById('gradesTableBody');
+const saveGradesBtn = document.getElementById('saveGradesBtn');
 
 
 // --- 2. CORE UTILITY FUNCTIONS ---
 
 function updateStatus(message, type = 'info') {
-    authStatusEl.textContent = message; // Use the new auth status bar
+    authStatusEl.textContent = message;
     const colors = {
         info: { bg: '#e0f7fa', text: '#01579b' },
         success: { bg: '#d4edda', text: '#155724' },
@@ -61,7 +78,6 @@ function updateStatus(message, type = 'info') {
 }
 
 function switchModule(moduleId) {
-    // Logic to switch between Attendance, Gradebook, etc.
     moduleSections.forEach(sec => sec.classList.remove('active'));
     document.getElementById(moduleId).classList.add('active');
 
@@ -71,23 +87,25 @@ function switchModule(moduleId) {
             btn.classList.add('active');
         }
     });
+    
+    // NEW: Load grading items whenever the Gradebook is opened
+    if (moduleId === 'grade') {
+        loadGradingItems();
+    }
+    
     updateStatus(`Module ready: ${moduleId}.`);
 }
 
-// --- 3. AUTHENTICATION LOGIC ---
+// --- 3. AUTHENTICATION LOGIC (UNCHANGED) ---
 
-// This function runs every time the user's login status changes (refresh, login, logout)
 auth.onAuthStateChanged(user => {
     if (user) {
-        // User is logged in
         authScreenEl.classList.remove('active');
         mainAppScreenEl.classList.add('active');
-        
         userNameEl.textContent = user.email;
         updateStatus(`Welcome back, ${user.email}!`, 'success');
-        switchModule('attendance'); // Show the app
+        switchModule('attendance');
     } else {
-        // User is logged out
         authScreenEl.classList.add('active');
         mainAppScreenEl.classList.remove('active');
         updateStatus('Please sign in to access the system.', 'info');
@@ -107,9 +125,6 @@ async function handleRegister() {
     try {
         updateStatus('Creating new account...', 'info');
         await auth.createUserWithEmailAndPassword(email, password);
-        
-        // Firebase automatically logs the user in upon successful creation
-        // The onAuthStateChanged function above handles the screen switch
     } catch (error) {
         updateStatus(`Registration Error: ${error.message}`, 'error');
     }
@@ -127,7 +142,6 @@ async function handleLogin() {
     try {
         updateStatus('Signing in...', 'info');
         await auth.signInWithEmailAndPassword(email, password);
-        // The onAuthStateChanged function handles the screen switch
     } catch (error) {
         updateStatus(`Login Error: ${error.message}`, 'error');
     }
@@ -139,16 +153,16 @@ function handleLogout() {
 }
 
 
-// --- 4. ATTENDANCE LOGIC (Protected by Auth) ---
+// --- 4. ATTENDANCE LOGIC (UNCHANGED) ---
 
 const DUMMY_STUDENTS = [
     "Kwame Nkrumah", "Yaa Asantewaa", "John Kufuor", "Ama Ghana", "Kofi Annan"
 ];
 
 function renderAttendanceTable(students) {
-    tableBody.innerHTML = ''; 
+    attendanceTableBody.innerHTML = ''; 
     students.forEach((student) => {
-        const row = tableBody.insertRow();
+        const row = attendanceTableBody.insertRow();
         row.insertCell(0).textContent = student;
         const statusCell = row.insertCell(1);
         statusCell.innerHTML = `
@@ -164,7 +178,6 @@ function renderAttendanceTable(students) {
 
 
 function handleLoadStudents() {
-    // Only loads students if a user is logged in
     if (!auth.currentUser) {
         updateStatus("Error: Please log in to load data.", 'error');
         return;
@@ -183,7 +196,6 @@ function handleLoadStudents() {
 }
 
 async function handleSaveAttendance() {
-    // Check if the user is authenticated before saving to Firestore
     if (!auth.currentUser) {
         updateStatus("Security Error: You must be logged in to save data.", 'error');
         return;
@@ -193,7 +205,6 @@ async function handleSaveAttendance() {
     const selectedDate = attDateEl.value;
     const records = [];
     
-    // Logic to gather records
     tableBody.querySelectorAll('tr').forEach(row => {
         const name = row.cells[0].textContent;
         const status = row.cells[1].querySelector('.status-select').value;
@@ -214,7 +225,7 @@ async function handleSaveAttendance() {
             class: selectedClass,
             date: selectedDate,
             records: records,
-            savedBy: auth.currentUser.email, // Add the user's email for auditing
+            savedBy: auth.currentUser.email,
             savedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
@@ -226,14 +237,168 @@ async function handleSaveAttendance() {
 }
 
 
-// --- 5. EVENT LISTENERS & INITIAL SETUP ---
+// --- 5. GRADEBOOK LOGIC (NEW) ---
+
+async function handleAddGradeItem() {
+    if (!auth.currentUser) {
+        updateStatus("Security Error: You must be logged in to add a grading item.", 'error');
+        return;
+    }
+    
+    const subject = gradeSubjectEl.value;
+    const itemName = gradeItemNameEl.value.trim();
+    const totalMarks = parseInt(totalMarksEl.value);
+
+    if (itemName === '' || isNaN(totalMarks) || totalMarks <= 0) {
+        updateStatus("Error: Provide a valid Item Name and Total Marks.", 'error');
+        return;
+    }
+    
+    const itemData = {
+        subject: subject,
+        name: itemName,
+        totalMarks: totalMarks,
+        createdBy: auth.currentUser.email,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    updateStatus(`Adding new grading item: ${itemName}...`, 'info');
+    
+    try {
+        await db.collection(GRADING_ITEM_COLLECTION).add(itemData);
+        updateStatus(`SUCCESS! Grading item '${itemName}' added.`, 'success');
+        
+        // Clear form and reload dropdown
+        gradeItemNameEl.value = '';
+        totalMarksEl.value = '';
+        loadGradingItems(); 
+    } catch (error) {
+        console.error("Firebase Add Item Error:", error);
+        updateStatus(`ERROR adding item: ${error.message}`, 'error');
+    }
+}
+
+
+async function loadGradingItems() {
+    if (!auth.currentUser) return; // Must be logged in
+    
+    try {
+        const snapshot = await db.collection(GRADING_ITEM_COLLECTION).get();
+        
+        gradingItemSelectEl.innerHTML = '<option value="">-- Select Test/Assignment --</option>';
+        
+        snapshot.forEach(doc => {
+            const item = doc.data();
+            const option = document.createElement('option');
+            option.value = doc.id; // Store the unique ID of the item
+            option.textContent = `${item.subject}: ${item.name} (Max: ${item.totalMarks})`;
+            option.dataset.max = item.totalMarks; // Store max score on the option
+            gradingItemSelectEl.appendChild(option);
+        });
+        
+        updateStatus(`Loaded ${snapshot.size} grading items.`);
+    } catch (error) {
+        updateStatus("Error loading grading items.", 'error');
+    }
+}
+
+function handleLoadGradeStudents() {
+     if (!auth.currentUser) {
+        updateStatus("Error: Please log in to load data.", 'error');
+        return;
+    }
+    
+    const selectedItem = gradingItemSelectEl.options[gradingItemSelectEl.selectedIndex];
+    const selectedClass = gradeClassEl.value;
+
+    if (!selectedItem.value) {
+        updateStatus("Error: Please create or select a grading item first.", 'error');
+        return;
+    }
+    
+    const totalMarks = selectedItem.dataset.max;
+    
+    // Render the student table for grading
+    gradesTableBody.innerHTML = '';
+    DUMMY_STUDENTS.forEach((student) => {
+        const row = gradesTableBody.insertRow();
+        row.insertCell(0).textContent = student;
+        
+        const inputCell = row.insertCell(1);
+        inputCell.innerHTML = `
+            <input type="number" class="score-input" data-student="${student}" min="0" max="${totalMarks}" placeholder="Score / ${totalMarks}">
+        `;
+    });
+    
+    saveGradesBtn.disabled = DUMMY_STUDENTS.length === 0;
+    updateStatus(`Students loaded for ${selectedItem.textContent} (${selectedClass}). Enter scores.`);
+}
+
+
+async function handleSaveGrades() {
+    if (!auth.currentUser) {
+        updateStatus("Security Error: You must be logged in to save grades.", 'error');
+        return;
+    }
+
+    const selectedItem = gradingItemSelectEl.options[gradingItemSelectEl.selectedIndex];
+    const selectedClass = gradeClassEl.value;
+    const totalMarks = selectedItem.dataset.max;
+
+    const gradeRecords = [];
+    
+    // Gather grades from the table
+    gradesTableBody.querySelectorAll('tr').forEach(row => {
+        const studentName = row.cells[0].textContent;
+        const scoreInput = row.cells[1].querySelector('.score-input');
+        const score = parseInt(scoreInput.value);
+
+        if (!isNaN(score) && scoreInput.value.trim() !== '') {
+             gradeRecords.push({ 
+                student: studentName, 
+                score: score, 
+                max: totalMarks 
+            });
+        }
+    });
+
+    if (gradeRecords.length === 0) {
+        updateStatus("Nothing to save.", 'error');
+        return;
+    }
+    
+    updateStatus('Saving student grades to the Cloud...', 'info');
+
+    try {
+        // Create a single document for this class's grades for this specific item
+        const docId = `${selectedItem.value}_${selectedClass}`; 
+        
+        await db.collection(GRADES_COLLECTION).doc(docId).set({
+            gradingItemId: selectedItem.value,
+            gradingItemName: selectedItem.textContent,
+            class: selectedClass,
+            totalMarks: totalMarks,
+            grades: gradeRecords,
+            savedBy: auth.currentUser.email,
+            savedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        updateStatus(`SUCCESS! ${gradeRecords.length} grades saved for ${selectedClass}.`, 'success');
+    } catch (error) {
+        console.error("Firebase Grade Save Error:", error);
+        updateStatus(`ERROR! Failed to save grades: ${error.message}`, 'error');
+    }
+}
+
+
+// --- 6. EVENT LISTENERS & INITIAL SETUP ---
 
 // Authentication Buttons
 registerBtn.addEventListener('click', handleRegister);
 loginBtn.addEventListener('click', handleLogin);
 logoutBtn.addEventListener('click', handleLogout);
 
-// Module Tabs
+// Module Tabs (uses switchModule)
 tabBtns.forEach(btn => {
     btn.addEventListener('click', () => switchModule(btn.getAttribute('data-module')));
 });
@@ -241,3 +406,8 @@ tabBtns.forEach(btn => {
 // Attendance Module
 loadStudentsBtn.addEventListener('click', handleLoadStudents);
 saveAttendanceBtn.addEventListener('click', handleSaveAttendance);
+
+// Gradebook Module (NEW)
+addGradeItemBtn.addEventListener('click', handleAddGradeItem);
+loadGradeStudentsBtn.addEventListener('click', handleLoadGradeStudents);
+saveGradesBtn.addEventListener('click', handleSaveGrades);
