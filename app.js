@@ -1,4 +1,4 @@
-// app.js - Main logic for ScholarLink SMS
+// main.js - Main logic for ScholarLink SMS
 
 // --- FIREBASE CONFIGURATION & INITIALIZATION ---
 
@@ -71,6 +71,12 @@ const studentNameDisplayEl = document.getElementById('studentNameDisplay');
 const attendanceSummaryEl = document.getElementById('attendanceSummary');
 const gradesSummaryBodyEl = document.getElementById('gradesSummaryBody');
 
+// Headmaster Dashboard References (NEW)
+const totalTeachersEl = document.getElementById('totalTeachers');
+const totalAttendanceDaysEl = document.getElementById('totalAttendanceDays');
+const avgAttendanceRateEl = document.getElementById('avgAttendanceRate');
+const recentGradesBodyEl = document.getElementById('recentGradesBody');
+
 
 // --- 2. CORE UTILITY FUNCTIONS ---
 
@@ -98,12 +104,14 @@ function switchModule(moduleId) {
     
     if (moduleId === 'grade') {
         loadGradingItems();
+    } else if (moduleId === 'headmaster-dashboard') { // New Dashboard Handler
+        loadDashboardSummary(); 
     }
     
     updateStatus(`Module ready: ${moduleId}.`);
 }
 
-// --- 3. AUTHENTICATION LOGIC ---
+// --- 3. AUTHENTICATION LOGIC (UNCHANGED) ---
 
 auth.onAuthStateChanged(user => {
     if (user) {
@@ -160,7 +168,7 @@ function handleLogout() {
 }
 
 
-// --- 4. ATTENDANCE LOGIC ---
+// --- 4. ATTENDANCE LOGIC (UNCHANGED) ---
 
 const DUMMY_STUDENTS = [
     "Kwame Nkrumah", "Yaa Asantewaa", "John Kufuor", "Ama Ghana", "Kofi Annan"
@@ -244,7 +252,7 @@ async function handleSaveAttendance() {
 }
 
 
-// --- 5. GRADEBOOK LOGIC ---
+// --- 5. GRADEBOOK LOGIC (UNCHANGED) ---
 
 async function handleAddGradeItem() {
     if (!auth.currentUser) {
@@ -291,14 +299,12 @@ async function loadGradingItems() {
     if (!auth.currentUser) return;
     
     try {
-        // FIX: Removed the .where() filter to bypass the index issue.
         const snapshot = await db.collection(GRADING_ITEM_COLLECTION).get();
         
         gradingItemSelectEl.innerHTML = '<option value="">-- Select Test/Assignment --</option>';
         
         snapshot.forEach(doc => {
             const item = doc.data();
-            // Client-side filter to only show items created by the current user (FIX)
             if (item.createdBy === auth.currentUser.email) { 
                 const option = document.createElement('option');
                 option.value = doc.id;
@@ -407,7 +413,7 @@ async function handleSaveGrades() {
 }
 
 
-// --- 6. PARENT PORTAL LOGIC ---
+// --- 6. PARENT PORTAL LOGIC (UNCHANGED) ---
 
 async function handleLookupRecords() {
     if (!auth.currentUser) {
@@ -497,7 +503,67 @@ async function handleLookupRecords() {
 }
 
 
-// --- 7. EVENT LISTENERS & INITIAL SETUP ---
+// --- 7. HEADMASTER DASHBOARD LOGIC (NEW) ---
+
+async function loadDashboardSummary() {
+    if (!auth.currentUser) return;
+    updateStatus('Loading School Dashboard Summary...', 'info');
+
+    try {
+        // A. Teachers Count (Placeholder/Estimate from Auth)
+        // NOTE: Firebase does not allow direct fetching of all Auth users in client-side code for security. 
+        // We'll use a simple estimation or placeholder for now.
+        totalTeachersEl.textContent = '2+ (Based on current log-ins)';
+
+
+        // B. Total Attendance Summary
+        const attendanceSnapshot = await db.collection(ATTENDANCE_COLLECTION).get();
+        let totalDays = attendanceSnapshot.docs.length;
+        let totalStudentsMarked = 0;
+        let totalPresent = 0;
+        
+        attendanceSnapshot.forEach(doc => {
+            const records = doc.data().records;
+            totalStudentsMarked += records.length;
+            totalPresent += records.filter(r => r.status === 'Present').length;
+        });
+
+        const avgRate = totalStudentsMarked > 0 ? ((totalPresent / totalStudentsMarked) * 100).toFixed(1) : '0.0';
+
+        totalAttendanceDaysEl.textContent = totalDays;
+        avgAttendanceRateEl.textContent = `${avgRate}%`;
+
+
+        // C. Recent Grades (Last 5 Entries)
+        const gradesSnapshot = await db.collection(GRADES_COLLECTION)
+            .orderBy('savedAt', 'desc')
+            .limit(5)
+            .get();
+
+        recentGradesBodyEl.innerHTML = '';
+        if (gradesSnapshot.empty) {
+            recentGradesBodyEl.innerHTML = '<tr><td colspan="4">No grades saved yet.</td></tr>';
+        } else {
+            gradesSnapshot.forEach(doc => {
+                const data = doc.data();
+                const row = recentGradesBodyEl.insertRow();
+                row.insertCell(0).textContent = data.gradingItemName.split(':')[1].trim();
+                row.insertCell(1).textContent = data.class;
+                row.insertCell(2).textContent = data.grades.length;
+                row.insertCell(3).textContent = data.savedBy.split('@')[0];
+            });
+        }
+        
+        updateStatus('Dashboard loaded successfully!', 'success');
+
+    } catch (error) {
+        console.error("Dashboard Load Error:", error);
+        updateStatus(`ERROR loading dashboard: ${error.message}`, 'error');
+    }
+}
+
+
+// --- 8. EVENT LISTENERS & INITIAL SETUP ---
 
 // Authentication Buttons
 registerBtn.addEventListener('click', handleRegister);
