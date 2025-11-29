@@ -35,11 +35,11 @@ const SCHOOL_CLASSES = [
     "JHS1", "JHS2", "JHS3", "SHS1", "SHS2", "SHS3"
 ];
 
-// --- 1. DOM Element References (All now assumed to be in index.html) ---
+// --- 1. DOM Element References ---
 
 // Main Sections
-const authSectionEl = document.getElementById('auth-section'); // The login box container
-const appSectionEl = document.getElementById('app-section');   // The main application container
+const authSectionEl = document.getElementById('auth-section'); 
+const appSectionEl = document.getElementById('app-section');   
 
 // General/Auth
 const authStatusEl = document.getElementById('auth-status');
@@ -54,7 +54,7 @@ const userNameEl = document.getElementById('userName');
 const tabBtns = document.querySelectorAll('.tab-btn');
 const moduleSections = document.querySelectorAll('.module-section'); 
 
-// (Remaining module references omitted for brevity, they remain the same)
+// Module specific references (all assumed to exist on index.html)
 const attClassEl = document.getElementById('attClass');
 const attDateEl = document.getElementById('attDate');
 const loadStudentsBtn = document.getElementById('loadStudentsBtn');
@@ -101,7 +101,6 @@ function updateStatus(message, type = 'info') {
 }
 
 function populateClassDropdowns() {
-    // ... (Function content remains the same) ...
     const classSelects = [attClassEl, gradeClassEl, lookupClassEl, newStudentClassEl].filter(el => el != null);
     
     classSelects.forEach(selectEl => {
@@ -116,7 +115,6 @@ function populateClassDropdowns() {
 }
 
 function switchModule(moduleId) {
-    // ... (Function content remains the same) ...
     if (!moduleSections || moduleSections.length === 0) return; 
 
     moduleSections.forEach(sec => sec.classList.remove('active'));
@@ -143,14 +141,14 @@ function switchModule(moduleId) {
 
 function initializeApplicationLogic(user) {
     // 1. Swap Views: Hide login, Show App
-    authSectionEl.classList.add('hidden');
-    appSectionEl.classList.remove('hidden');
+    if (authSectionEl) authSectionEl.classList.add('hidden');
+    if (appSectionEl) appSectionEl.classList.remove('hidden');
 
     // 2. Display User Info and Status
-    userNameEl.textContent = user.email;
+    if (userNameEl) userNameEl.textContent = user.email;
     updateStatus(`Welcome back, ${user.email}!`, 'success');
     
-    // 3. Set up all App Event Listeners (Only on initial load)
+    // 3. Set up all App Event Listeners
     populateClassDropdowns();
 
     // Module Tabs
@@ -159,7 +157,7 @@ function initializeApplicationLogic(user) {
     });
 
     // Logout Button
-    logoutBtn.addEventListener('click', handleLogout);
+    if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
 
     // Module specific listeners (Check if element exists before adding listener)
     if (loadStudentsBtn) loadStudentsBtn.addEventListener('click', handleLoadStudents);
@@ -177,8 +175,8 @@ function initializeApplicationLogic(user) {
 
 function resetApplicationView() {
     // 1. Swap Views: Hide App, Show Login
-    authSectionEl.classList.remove('hidden');
-    appSectionEl.classList.add('hidden');
+    if (authSectionEl) authSectionEl.classList.remove('hidden');
+    if (appSectionEl) appSectionEl.classList.add('hidden');
     updateStatus('You have been logged out. Please log in.', 'info');
 }
 
@@ -196,7 +194,6 @@ auth.onAuthStateChanged(user => {
 
 
 async function handleRegister() {
-    // ... (Function content remains the same) ...
     const email = loginEmailEl.value;
     const password = loginPasswordEl.value;
     
@@ -215,7 +212,6 @@ async function handleRegister() {
 }
 
 async function handleLogin() {
-    // ... (Function content remains the same) ...
     const email = loginEmailEl.value;
     const password = loginPasswordEl.value;
     
@@ -239,52 +235,472 @@ function handleLogout() {
 }
 
 
-// --- 4. MODULE LOGIC (Functions below remain the same as previous full version) ---
-/* (Remaining functions like renderAttendanceTable, handleLoadStudents, handleSaveAttendance,
-   handleAddGradeItem, loadGradingItems, handleLoadGradeStudents, handleSaveGrades,
-   handleLookupRecords, handleAddStudent, loadStudentsByClass, loadDashboardSummary
-   are omitted here for response length, but you must paste the full content 
-   from the previous corrected main.js file below this line in your GitHub file.)
-*/
+// --- 4. ATTENDANCE LOGIC ---
+
+function renderAttendanceTable(students) {
+    if (!attendanceTableBody) return;
+    attendanceTableBody.innerHTML = ''; 
+    students.forEach((student) => {
+        const row = attendanceTableBody.insertRow();
+        row.insertCell(0).textContent = student.name;
+        const statusCell = row.insertCell(1);
+        statusCell.innerHTML = `
+            <select class="status-select" data-student="${student.name}">
+                <option value="Present">Present</option>
+                <option value="Absent">Absent</option>
+                <option value="Late">Late</option>
+            </select>
+        `;
+    });
+    if (saveAttendanceBtn) saveAttendanceBtn.disabled = students.length === 0;
+}
+
+
+async function handleLoadStudents() {
+    if (!auth.currentUser || !attClassEl || !attDateEl || !attendanceTableBody) return;
+    const selectedClass = attClassEl.value;
+    const selectedDate = attDateEl.value;
+
+    if (!selectedDate) {
+        updateStatus("Error: Please select a date first.", 'error');
+        return;
+    }
+
+    updateStatus(`Loading students for ${selectedClass} on ${selectedDate}...`);
+    
+    try {
+        const snapshot = await db.collection(STUDENTS_COLLECTION)
+            .where('class', '==', selectedClass)
+            .orderBy('name', 'asc')
+            .get();
+            
+        const students = snapshot.docs.map(doc => doc.data());
+        
+        if (students.length === 0) {
+            updateStatus(`No students found for ${selectedClass}. Please add students via the Dashboard.`, 'error');
+            attendanceTableBody.innerHTML = '<tr><td colspan="2">No students found.</td></tr>';
+            if (saveAttendanceBtn) saveAttendanceBtn.disabled = true;
+            return;
+        }
+
+        renderAttendanceTable(students);
+        updateStatus(`${students.length} students loaded for ${selectedClass}. Mark attendance.`);
+
+    } catch (error) {
+        updateStatus(`Error loading students: ${error.message}`, 'error');
+    }
+}
+
+async function handleSaveAttendance() {
+    if (!auth.currentUser || !attClassEl || !attDateEl || !attendanceTableBody) return;
+
+    const selectedClass = attClassEl.value;
+    const selectedDate = attDateEl.value;
+    const records = [];
+    
+    document.querySelectorAll('#attendanceTableBody tr').forEach(row => {
+        const name = row.cells[0].textContent;
+        const status = row.cells[1].querySelector('.status-select').value;
+        records.push({ name, status });
+    });
+    
+    if (records.length === 0) {
+        updateStatus("Nothing to save.", 'error');
+        return;
+    }
+
+    updateStatus('Saving attendance records to the Cloud...', 'info');
+    
+    try {
+        const docId = `${selectedClass}_${selectedDate}`;
+        
+        await db.collection(ATTENDANCE_COLLECTION).doc(docId).set({
+            class: selectedClass,
+            date: selectedDate,
+            records: records,
+            savedBy: auth.currentUser.email,
+            savedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        updateStatus(`SUCCESS! Records saved by ${auth.currentUser.email}.`, 'success');
+    } catch (error) {
+        console.error("Firebase Save Error:", error);
+        updateStatus(`ERROR! Failed to save to Cloud. See console.`, 'error');
+    }
+}
+
+
+// --- 5. GRADEBOOK LOGIC ---
+
+async function handleAddGradeItem() {
+    if (!auth.currentUser || !gradeSubjectEl || !gradeItemNameEl || !totalMarksEl) return;
+    
+    const subject = gradeSubjectEl.value;
+    const itemName = gradeItemNameEl.value.trim();
+    const totalMarks = parseInt(totalMarksEl.value);
+
+    if (itemName === '' || isNaN(totalMarks) || totalMarks <= 0) {
+        updateStatus("Error: Provide a valid Item Name and Total Marks.", 'error');
+        return;
+    }
+    
+    const itemData = {
+        subject: subject,
+        name: itemName,
+        totalMarks: totalMarks,
+        createdBy: auth.currentUser.email,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    updateStatus(`Adding new grading item: ${itemName}...`, 'info');
+    
+    try {
+        const docId = `${auth.currentUser.uid}_${subject}_${itemName.replace(/\s/g, '_')}`;
+        await db.collection(GRADING_ITEM_COLLECTION).doc(docId).set(itemData);
+        
+        updateStatus(`SUCCESS! Grading item '${itemName}' added.`, 'success');
+        
+        gradeItemNameEl.value = '';
+        totalMarksEl.value = '';
+        loadGradingItems(); 
+    } catch (error) {
+        console.error("Firebase Add Item Error:", error);
+        updateStatus(`ERROR adding item: ${error.message}`, 'error');
+    }
+}
+
+
+async function loadGradingItems() {
+    if (!auth.currentUser || !gradingItemSelectEl) return;
+    
+    try {
+        const snapshot = await db.collection(GRADING_ITEM_COLLECTION).get();
+        
+        gradingItemSelectEl.innerHTML = '<option value="">-- Select Test/Assignment --</option>';
+        
+        snapshot.forEach(doc => {
+            const item = doc.data();
+            
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = `${item.subject}: ${item.name} (Max: ${item.totalMarks})`;
+            option.dataset.max = item.totalMarks;
+            gradingItemSelectEl.appendChild(option);
+        });
+        
+        updateStatus(`Loaded ${gradingItemSelectEl.options.length - 1} grading items.`);
+    } catch (error) {
+        updateStatus("Error loading grading items.", 'error');
+    }
+}
+
+async function handleLoadGradeStudents() {
+     if (!auth.currentUser || !gradingItemSelectEl || !gradeClassEl || !gradesTableBody) return;
+    
+    const selectedItem = gradingItemSelectEl.options[gradingItemSelectEl.selectedIndex];
+    
+    if (!selectedItem || !selectedItem.value) {
+        updateStatus("Error: Please create or select a grading item first.", 'error');
+        return;
+    }
+    
+    const totalMarks = selectedItem.dataset.max;
+    const selectedClass = gradeClassEl.value;
+
+    gradesTableBody.innerHTML = '';
+    
+    try {
+        const snapshot = await db.collection(STUDENTS_COLLECTION)
+            .where('class', '==', selectedClass)
+            .orderBy('name', 'asc')
+            .get();
+            
+        const students = snapshot.docs.map(doc => doc.data());
+        
+        if (students.length === 0) {
+            updateStatus(`No students found for ${selectedClass}.`, 'error');
+            gradesTableBody.innerHTML = '<tr><td colspan="2">No students found.</td></tr>';
+            if (saveGradesBtn) saveGradesBtn.disabled = true;
+            return;
+        }
+        
+        students.forEach((student) => {
+            const row = gradesTableBody.insertRow();
+            row.insertCell(0).textContent = student.name;
+            
+            const inputCell = row.insertCell(1);
+            inputCell.innerHTML = `
+                <input type="number" class="score-input" data-student="${student.name}" min="0" max="${totalMarks}" placeholder="Score / ${totalMarks}">
+            `;
+        });
+
+        if (saveGradesBtn) saveGradesBtn.disabled = students.length === 0;
+        updateStatus(`Students loaded for ${selectedItem.textContent} (${selectedClass}). Enter scores.`);
+        
+    } catch (error) {
+        updateStatus(`Error loading students for grading: ${error.message}`, 'error');
+    }
+}
+
+
+async function handleSaveGrades() {
+    if (!auth.currentUser || !gradingItemSelectEl || !gradeClassEl) return;
+
+    const selectedItem = gradingItemSelectEl.options[gradingItemSelectEl.selectedIndex];
+    
+    if (!selectedItem || !selectedItem.value) {
+         updateStatus("Error: No valid grading item selected.", 'error');
+         return;
+    }
+    
+    const selectedItemId = selectedItem.value;
+    const selectedClass = gradeClassEl.value;
+    const totalMarks = selectedItem.dataset.max;
+
+    const gradeRecords = [];
+    
+    document.querySelectorAll('#gradesTableBody tr').forEach(row => {
+        const studentName = row.cells[0].textContent;
+        const scoreInput = row.cells[1].querySelector('.score-input');
+        const score = parseInt(scoreInput.value);
+
+        if (!isNaN(score) && scoreInput.value.trim() !== '' && score >= 0 && score <= totalMarks) {
+             gradeRecords.push({ 
+                student: studentName, 
+                score: score, 
+                max: totalMarks 
+            });
+        }
+    });
+
+    if (gradeRecords.length === 0) {
+        updateStatus("Nothing to save.", 'error');
+        return;
+    }
+    
+    updateStatus('Saving student grades to the Cloud...', 'info');
+
+    try {
+        const docId = `${selectedItemId}_${selectedClass}`; 
+        
+        await db.collection(GRADES_COLLECTION).doc(docId).set({
+            gradingItemId: selectedItemId,
+            gradingItemName: selectedItem.textContent,
+            class: selectedClass,
+            totalMarks: totalMarks,
+            grades: gradeRecords,
+            savedBy: auth.currentUser.email,
+            savedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        updateStatus(`SUCCESS! ${gradeRecords.length} grades saved for ${selectedClass}.`, 'success');
+    } catch (error) {
+        console.error("Firebase Grade Save Error:", error);
+        updateStatus(`ERROR! Failed to save grades: ${error.message}`, 'error');
+    }
+}
+
+
+// --- 6. PARENT PORTAL LOGIC ---
+
+async function handleLookupRecords() {
+    if (!auth.currentUser || !lookupNameEl || !lookupClassEl || !studentNameDisplayEl || !attendanceSummaryEl || !gradesSummaryBodyEl) return;
+    
+    const lookupName = lookupNameEl.value.trim();
+    const lookupClass = lookupClassEl.value;
+
+    if (!lookupName) {
+        updateStatus("Error: Please enter the student's full name.", 'error');
+        return;
+    }
+
+    // Clear previous results
+    studentNameDisplayEl.textContent = lookupName;
+    attendanceSummaryEl.innerHTML = '';
+    gradesSummaryBodyEl.innerHTML = '';
+    updateStatus(`Searching for records for ${lookupName} in ${lookupClass}...`, 'info');
+
+    // --- A. Fetch Attendance Records ---
+    try {
+        const attendanceSnapshot = await db.collection(ATTENDANCE_COLLECTION)
+            .where('class', '==', lookupClass)
+            .get();
+
+        let totalAttendanceDays = 0;
+        let presentCount = 0;
+        let absentCount = 0;
+
+        attendanceSnapshot.forEach(doc => {
+            const record = doc.data().records.find(r => r.name === lookupName);
+            if (record) {
+                totalAttendanceDays++;
+                if (record.status === 'Present') {
+                    presentCount++;
+                } else if (record.status === 'Absent') {
+                    absentCount++;
+                }
+            }
+        });
+
+        const presentPct = totalAttendanceDays > 0 ? ((presentCount / totalAttendanceDays) * 100).toFixed(1) : '0';
+        
+        attendanceSummaryEl.innerHTML = `
+            <li>Total Days Marked: <strong>${totalAttendanceDays}</strong></li>
+            <li>Present: <strong>${presentCount}</strong> (${presentPct}%)</li>
+            <li>Absent: <strong>${absentCount}</strong></li>
+            <li style="color: grey;">(Attendance data is aggregated across all recorded days in the class.)</li>
+        `;
+        
+    } catch (error) {
+        updateStatus(`Error retrieving attendance: ${error.message}`, 'error');
+    }
+
+
+    // --- B. Fetch Grades Records ---
+    try {
+        const gradesSnapshot = await db.collection(GRADES_COLLECTION)
+            .where('class', '==', lookupClass)
+            .get();
+
+        if (gradesSnapshot.empty) {
+            gradesSummaryBodyEl.innerHTML = `<tr><td colspan="3">No grades found for this class.</td></tr>`;
+        }
+
+        gradesSnapshot.forEach(doc => {
+            const gradeRecord = doc.data().grades.find(g => g.student === lookupName);
+            if (gradeRecord) {
+                const row = gradesSummaryBodyEl.insertRow();
+                row.insertCell(0).textContent = doc.data().gradingItemName.split(':')[1].trim();
+                row.insertCell(1).textContent = gradeRecord.score;
+                row.insertCell(2).textContent = gradeRecord.max;
+            }
+        });
+
+        if (gradesSummaryBodyEl.children.length === 0) {
+             gradesSummaryBodyEl.innerHTML = `<tr><td colspan="3">Student not found in any saved grade entries.</td></tr>`;
+        }
+        
+    } catch (error) {
+         updateStatus(`Error retrieving grades: ${error.message}`, 'error');
+    }
+    
+    updateStatus(`Records successfully loaded for ${lookupName}.`, 'success');
+}
+
+
+// --- 7. HEADMASTER DASHBOARD LOGIC ---
+
+async function handleAddStudent() {
+    if (!auth.currentUser || !newStudentNameEl || !newStudentClassEl) return;
+    
+    const name = newStudentNameEl.value.trim();
+    const classValue = newStudentClassEl.value;
+
+    if (name === '' || classValue === '') {
+        return updateStatus("Error: Student Name and Class are required.", 'error');
+    }
+    
+    updateStatus(`Adding student ${name} to ${classValue}...`, 'info');
+    
+    try {
+        await db.collection(STUDENTS_COLLECTION).add({
+            name: name,
+            class: classValue,
+            addedBy: auth.currentUser.email,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        updateStatus(`SUCCESS! Student ${name} added to ${classValue}.`, 'success');
+        newStudentNameEl.value = ''; // Clear input
+        loadStudentsByClass(classValue); // Refresh list
+    } catch (error) {
+        updateStatus(`ERROR adding student: ${error.message}`, 'error');
+    }
+}
+
+async function loadStudentsByClass(selectedClass = newStudentClassEl.value) {
+    if (!auth.currentUser || !studentListBodyEl || !newStudentClassEl) return;
+    
+    try {
+        const snapshot = await db.collection(STUDENTS_COLLECTION)
+            .where('class', '==', selectedClass)
+            .orderBy('name', 'asc')
+            .get();
+        
+        studentListBodyEl.innerHTML = '';
+        if (snapshot.empty) {
+            studentListBodyEl.innerHTML = `<tr><td colspan="2">No students registered in ${selectedClass}.</td></tr>`;
+        } else {
+            snapshot.forEach(doc => {
+                const student = doc.data();
+                const row = studentListBodyEl.insertRow();
+                row.insertCell(0).textContent = student.name;
+                row.insertCell(1).textContent = student.class;
+            });
+        }
+    } catch (error) {
+        console.error("Student List Load Error:", error);
+    }
+}
+
+
+async function loadDashboardSummary() {
+    if (!auth.currentUser || !totalTeachersEl || !totalAttendanceDaysEl || !avgAttendanceRateEl || !recentGradesBodyEl) return;
+    updateStatus('Loading School Dashboard Summary...', 'info');
+
+    try {
+        // A. Teachers Count (Placeholder/Estimate from Auth)
+        totalTeachersEl.textContent = '2+ (Based on current log-ins)';
+
+        // B. Total Attendance Summary
+        const attendanceSnapshot = await db.collection(ATTENDANCE_COLLECTION).get();
+        let totalDays = attendanceSnapshot.docs.length;
+        let totalStudentsMarked = 0;
+        let totalPresent = 0;
+        
+        attendanceSnapshot.forEach(doc => {
+            const records = doc.data().records;
+            totalStudentsMarked += records.length;
+            totalPresent += records.filter(r => r.status === 'Present').length;
+        });
+
+        const avgRate = totalStudentsMarked > 0 ? ((totalPresent / totalStudentsMarked) * 100).toFixed(1) : '0.0';
+
+        totalAttendanceDaysEl.textContent = totalDays;
+        avgAttendanceRateEl.textContent = `${avgRate}%`;
+
+
+        // C. Recent Grades (Last 5 Entries)
+        const gradesSnapshot = await db.collection(GRADES_COLLECTION)
+            .orderBy('savedAt', 'desc')
+            .limit(5)
+            .get();
+
+        recentGradesBodyEl.innerHTML = '';
+        if (gradesSnapshot.empty) {
+            recentGradesBodyEl.innerHTML = '<tr><td colspan="4">No grades saved yet.</td></tr>';
+        } else {
+            gradesSnapshot.forEach(doc => {
+                const data = doc.data();
+                const row = recentGradesBodyEl.insertRow();
+                row.insertCell(0).textContent = data.gradingItemName.split(':')[1].trim();
+                row.insertCell(1).textContent = data.class;
+                row.insertCell(2).textContent = data.grades.length;
+                row.insertCell(3).textContent = data.savedBy.split('@')[0];
+            });
+        }
+        
+        updateStatus('Dashboard loaded successfully!', 'success');
+
+    } catch (error) {
+        console.error("Dashboard Load Error:", error);
+        updateStatus(`ERROR loading dashboard: ${error.message}`, 'error');
+    }
+}
+
 
 // --- 8. EVENT LISTENERS & INITIAL SETUP (Login Page Only) ---
 
-// These listeners are outside of onAuthStateChanged so they are available immediately
+// Attach event listeners for the login page elements immediately
 if (loginBtn) loginBtn.addEventListener('click', handleLogin);
 if (registerBtn) registerBtn.addEventListener('click', handleRegister);
-
-// --- PASTE THE REMAINING MODULE LOGIC FUNCTIONS HERE FROM PREVIOUS MAIN.JS ---
-
-function renderAttendanceTable(students) {
-    // ... (Paste full function content) ...
-}
-async function handleLoadStudents() {
-    // ... (Paste full function content) ...
-}
-async function handleSaveAttendance() {
-    // ... (Paste full function content) ...
-}
-async function handleAddGradeItem() {
-    // ... (Paste full function content) ...
-}
-async function loadGradingItems() {
-    // ... (Paste full function content) ...
-}
-async function handleLoadGradeStudents() {
-    // ... (Paste full function content) ...
-}
-async function handleSaveGrades() {
-    // ... (Paste full function content) ...
-}
-async function handleLookupRecords() {
-    // ... (Paste full function content) ...
-}
-async function handleAddStudent() {
-    // ... (Paste full function content) ...
-}
-async function loadStudentsByClass(selectedClass = newStudentClassEl.value) {
-    // ... (Paste full function content) ...
-}
-async function loadDashboardSummary() {
-    // ... (Paste full function content) ...
-}
