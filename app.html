@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScholarLink SMS - Main Application</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+</head>
+<body>
+    <div class="container" id="main-app-screen">
+        <header>
+            <h1>ScholarLink School Management System</h1>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    Logged in as: <span id="userName">...</span>
+                    <button id="logoutBtn" class="logout-btn">Log Out</button>
+                </div>
+                <div id="auth-status" class="status">System Status: Ready.</div>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-module="attendance">Attendance</button>
+            <button class="tab-btn" data-module="grade">Gradebook</button>
+            <button class="tab-btn" data-module="parent-portal">Parent Portal</button>
+            <button class="tab-btn" data-module="headmaster-dashboard">Dashboard</button>
+        </div>
+
+        <div id="attendance" class="module-section active">
+            <h2>Attendance Log</h2>
+            <div class="input-group">
+                <div>
+                    <label for="attClass">Select Class:</label>
+                    <select id="attClass"></select>
+                </div>
+                <div>
+                    <label for="attDate">Date:</label>
+                    <input type="date" id="attDate" required>
+                </div>
+                <button id="loadStudentsBtn" class="primary-btn">Load Students</button>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Student Name</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="attendanceTableBody">
+                    <tr><td colspan="2">Select class and date to load students.</td></tr>
+                </tbody>
+            </table>
+            <button id="saveAttendanceBtn" class="primary-btn" disabled>Save Attendance</button>
+        </div>
+
+        <div id="grade" class="module-section">
+            <h2>Grade Item Creation</h2>
+            <div class="input-group">
+                <div>
+                    <label for="gradeSubject">Subject:</label>
+                    <input type="text" id="gradeSubject" placeholder="e.g., Science" value="Mathematics">
+                </div>
+                <div>
+                    <label for="gradeItemName">Test/Assignment Name:</label>
+                    <input type="text" id="gradeItemName" placeholder="e.g., Mid-Term Test">
+                </div>
+                <div>
+                    <label for="totalMarks">Total Marks:</label>
+                    <input type="number" id="totalMarks" placeholder="e.g., 50">
+                </div>
+                <button id="addGradeItemBtn" class="primary-btn">Add Grading Item</button>
+            </div>
+
+            <hr>
+
+            <h2>Enter Grades</h2>
+            <div class="input-group">
+                <div>
+                    <label for="gradingItemSelect">Select Grading Item:</label>
+                    <select id="gradingItemSelect"></select>
+                </div>
+                <div>
+                    <label for="gradeClass">Select Class:</label>
+                    <select id="gradeClass"></select>
+                </div>
+                <button id="loadGradeStudentsBtn" class="primary-btn">Load Students for Grading</button>
+            </div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Student Name</th>
+                        <th>Score</th>
+                    </tr>
+                </thead>
+                <tbody id="gradesTableBody">
+                    <tr><td colspan="2">Load a grading item and class to enter scores.</td></tr>
+                </tbody>
+            </table>
+            <button id="saveGradesBtn" class="primary-btn" disabled>Save Grades</button>
+        </div>
+
+        <div id="parent-portal" class="module-section">
+            <h2>Student Records Lookup</h2>
+            <div class="input-group">
+                <div>
+                    <label for="lookupName">Student Name:</label>
+                    <input type="text" id="lookupName" placeholder="e.g., Ama Ghana">
+                </div>
+                <div>
+                    <label for="lookupClass">Select Class:</label>
+                    <select id="lookupClass"></select>
+                </div>
+                <button id="lookupBtn" class="primary-btn">Look Up Records</button>
+            </div>
+            
+            <div id="records-display">
+                <h3>Records for <span id="studentNameDisplay">...</span></h3>
+                
+                <h4>Attendance Summary</h4>
+                <ul id="attendanceSummary">
+                    <li>No attendance data loaded.</li>
+                </ul>
+                
+                <h4>Grades Summary</h4>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test/Assignment</th>
+                            <th>Score</th>
+                            <th>Max Marks</th>
+                        </tr>
+                    </thead>
+                    <tbody id="gradesSummaryBody">
+                        <tr><td colspan="3">No grade data loaded.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="headmaster-dashboard" class="module-section">
+            <h2>Headmaster Dashboard: School Summary</h2>
+            <div class="summary-cards">
+                <div class="card">
+                    <h3>Total Teachers</h3>
+                    <p id="totalTeachers">Loading...</p>
+                </div>
+                <div class="card">
+                    <h3>Attendance Days Logged</h3>
+                    <p id="totalAttendanceDays">Loading...</p>
+                </div>
+                <div class="card">
+                    <h3>Average Attendance Rate</h3>
+                    <p id="avgAttendanceRate">Loading...</p>
+                </div>
+            </div>
+
+            <div style="margin-top: 30px;">
+                <h3>Student Management</h3>
+                <div class="input-group">
+                    <label for="newStudentName">Student Full Name:</label>
+                    <input type="text" id="newStudentName" placeholder="e.g., Ama Ghana">
+                    
+                    <label for="newStudentClass">Class:</label>
+                    <select id="newStudentClass"></select>
+                    
+                    <button id="addStudentBtn" class="primary-btn">Add New Student</button>
+                </div>
+                
+                <h4>Students in Selected Class:</h4>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Student Name</th>
+                            <th>Class</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studentListBody">
+                        </tbody>
+                </table>
+            </div>
+            <h3 style="margin-top: 30px;">Recent Grades Entered</h3>
+            <table id="recentGradesTable">
+                <thead>
+                    <tr>
+                        <th>Test/Assignment</th>
+                        <th>Class</th>
+                        <th>Students Marked</th>
+                        <th>Entered By</th>
+                    </tr>
+                </thead>
+                <tbody id="recentGradesBody">
+                    </tbody>
+            </table>
+        </div>
+        
+    </div>
+    
+    <script src="main.js"></script>
+</body>
+</html>
