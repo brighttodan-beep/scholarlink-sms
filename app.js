@@ -711,3 +711,4 @@ if (document.title.includes("Login")) {
     // Start on the Attendance Module on load
     switchModule('attendance');
 }
+
