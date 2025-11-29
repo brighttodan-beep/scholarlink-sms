@@ -63,7 +63,7 @@ const loadGradeStudentsBtn = document.getElementById('loadGradeStudentsBtn');
 const gradesTableBody = document.getElementById('gradesTableBody');
 const saveGradesBtn = document.getElementById('saveGradesBtn');
 
-// Parent Portal References (NEW)
+// Parent Portal References
 const lookupNameEl = document.getElementById('lookupName');
 const lookupClassEl = document.getElementById('lookupClass');
 const lookupBtn = document.getElementById('lookupBtn');
@@ -103,7 +103,7 @@ function switchModule(moduleId) {
     updateStatus(`Module ready: ${moduleId}.`);
 }
 
-// --- 3. AUTHENTICATION LOGIC (UNCHANGED) ---
+// --- 3. AUTHENTICATION LOGIC ---
 
 auth.onAuthStateChanged(user => {
     if (user) {
@@ -123,13 +123,35 @@ auth.onAuthStateChanged(user => {
 async function handleRegister() {
     const email = loginEmailEl.value;
     const password = loginPasswordEl.value;
-    // ... (registration logic unchanged)
+    
+    if (email.trim() === '' || password.trim() === '') {
+        updateStatus("Error: Email and Password are required.", 'error');
+        return;
+    }
+
+    try {
+        updateStatus('Creating new account...', 'info');
+        await auth.createUserWithEmailAndPassword(email, password);
+    } catch (error) {
+        updateStatus(`Registration Error: ${error.message}`, 'error');
+    }
 }
 
 async function handleLogin() {
     const email = loginEmailEl.value;
     const password = loginPasswordEl.value;
-    // ... (login logic unchanged)
+    
+    if (email.trim() === '' || password.trim() === '') {
+        updateStatus("Error: Email and Password are required.", 'error');
+        return;
+    }
+    
+    try {
+        updateStatus('Signing in...', 'info');
+        await auth.signInWithEmailAndPassword(email, password);
+    } catch (error) {
+        updateStatus(`Login Error: ${error.message}`, 'error');
+    }
 }
 
 function handleLogout() {
@@ -138,29 +160,130 @@ function handleLogout() {
 }
 
 
-// --- 4. ATTENDANCE LOGIC (UNCHANGED) ---
+// --- 4. ATTENDANCE LOGIC ---
 
 const DUMMY_STUDENTS = [
     "Kwame Nkrumah", "Yaa Asantewaa", "John Kufuor", "Ama Ghana", "Kofi Annan"
 ];
 
 function renderAttendanceTable(students) {
-    // ... (render attendance table logic unchanged)
+    attendanceTableBody.innerHTML = ''; 
+    students.forEach((student) => {
+        const row = attendanceTableBody.insertRow();
+        row.insertCell(0).textContent = student;
+        const statusCell = row.insertCell(1);
+        statusCell.innerHTML = `
+            <select class="status-select" data-student="${student}">
+                <option value="Present">Present</option>
+                <option value="Absent">Absent</option>
+                <option value="Late">Late</option>
+            </select>
+        `;
+    });
+    saveAttendanceBtn.disabled = students.length === 0;
 }
 
+
 function handleLoadStudents() {
-    // ... (load student logic unchanged)
+    if (!auth.currentUser) {
+        updateStatus("Error: Please log in to load data.", 'error');
+        return;
+    }
+    const selectedClass = attClassEl.value;
+    const selectedDate = attDateEl.value;
+
+    if (!selectedDate) {
+        updateStatus("Error: Please select a date first.", 'error');
+        return;
+    }
+
+    updateStatus(`Loading students for ${selectedClass} on ${selectedDate}...`);
+    renderAttendanceTable(DUMMY_STUDENTS);
+    updateStatus(`5 students loaded for ${selectedClass}. Mark attendance.`);
 }
 
 async function handleSaveAttendance() {
-    // ... (save attendance logic unchanged)
+    if (!auth.currentUser) {
+        updateStatus("Security Error: You must be logged in to save data.", 'error');
+        return;
+    }
+
+    const selectedClass = attClassEl.value;
+    const selectedDate = attDateEl.value;
+    const records = [];
+    
+    document.querySelectorAll('#attendanceTableBody tr').forEach(row => {
+        const name = row.cells[0].textContent;
+        const status = row.cells[1].querySelector('.status-select').value;
+        records.push({ name, status });
+    });
+    
+    if (records.length === 0) {
+        updateStatus("Nothing to save.", 'error');
+        return;
+    }
+
+    updateStatus('Saving attendance records to the Cloud...', 'info');
+    
+    try {
+        const docId = `${selectedClass}_${selectedDate}`;
+        
+        await db.collection(ATTENDANCE_COLLECTION).doc(docId).set({
+            class: selectedClass,
+            date: selectedDate,
+            records: records,
+            savedBy: auth.currentUser.email,
+            savedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        updateStatus(`SUCCESS! Records saved by ${auth.currentUser.email}.`, 'success');
+    } catch (error) {
+        console.error("Firebase Save Error:", error);
+        updateStatus(`ERROR! Failed to save to Cloud. See console.`, 'error');
+    }
 }
 
 
-// --- 5. GRADEBOOK LOGIC (FIXED) ---
+// --- 5. GRADEBOOK LOGIC ---
 
 async function handleAddGradeItem() {
-    // ... (add grade item logic unchanged)
+    if (!auth.currentUser) {
+        updateStatus("Security Error: You must be logged in to add a grading item.", 'error');
+        return;
+    }
+    
+    const subject = gradeSubjectEl.value;
+    const itemName = gradeItemNameEl.value.trim();
+    const totalMarks = parseInt(totalMarksEl.value);
+
+    if (itemName === '' || isNaN(totalMarks) || totalMarks <= 0) {
+        updateStatus("Error: Provide a valid Item Name and Total Marks.", 'error');
+        return;
+    }
+    
+    const itemData = {
+        subject: subject,
+        name: itemName,
+        totalMarks: totalMarks,
+        createdBy: auth.currentUser.email,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    updateStatus(`Adding new grading item: ${itemName}...`, 'info');
+    
+    try {
+        const docId = `${auth.currentUser.uid}_${subject}_${itemName.replace(/\s/g, '_')}`;
+        await db.collection(GRADING_ITEM_COLLECTION).doc(docId).set(itemData);
+        
+        updateStatus(`SUCCESS! Grading item '${itemName}' added.`, 'success');
+        
+        gradeItemNameEl.value = '';
+        totalMarksEl.value = '';
+        loadGradingItems(); 
+    } catch (error) {
+        console.error("Firebase Add Item Error:", error);
+        updateStatus(`ERROR adding item: ${error.message}`, 'error');
+    }
 }
 
 
@@ -168,6 +291,7 @@ async function loadGradingItems() {
     if (!auth.currentUser) return;
     
     try {
+        // FIX: Removed the .where() filter to bypass the index issue.
         const snapshot = await db.collection(GRADING_ITEM_COLLECTION).get();
         
         gradingItemSelectEl.innerHTML = '<option value="">-- Select Test/Assignment --</option>';
@@ -191,15 +315,99 @@ async function loadGradingItems() {
 }
 
 function handleLoadGradeStudents() {
-    // ... (load grade students logic unchanged)
+     if (!auth.currentUser) {
+        updateStatus("Error: Please log in to load data.", 'error');
+        return;
+    }
+    
+    const selectedItem = gradingItemSelectEl.options[gradingItemSelectEl.selectedIndex];
+    
+    if (!selectedItem || !selectedItem.value) {
+        updateStatus("Error: Please create or select a grading item first.", 'error');
+        return;
+    }
+    
+    const totalMarks = selectedItem.dataset.max;
+    const selectedClass = gradeClassEl.value;
+
+    gradesTableBody.innerHTML = '';
+    DUMMY_STUDENTS.forEach((student) => {
+        const row = gradesTableBody.insertRow();
+        row.insertCell(0).textContent = student;
+        
+        const inputCell = row.insertCell(1);
+        inputCell.innerHTML = `
+            <input type="number" class="score-input" data-student="${student}" min="0" max="${totalMarks}" placeholder="Score / ${totalMarks}">
+        `;
+    });
+    
+    saveGradesBtn.disabled = DUMMY_STUDENTS.length === 0;
+    updateStatus(`Students loaded for ${selectedItem.textContent} (${selectedClass}). Enter scores.`);
 }
 
 
 async function handleSaveGrades() {
-    // ... (save grades logic unchanged)
+    if (!auth.currentUser) {
+        updateStatus("Security Error: You must be logged in to save grades.", 'error');
+        return;
+    }
+
+    const selectedItem = gradingItemSelectEl.options[gradingItemSelectEl.selectedIndex];
+    
+    if (!selectedItem || !selectedItem.value) {
+         updateStatus("Error: No valid grading item selected.", 'error');
+         return;
+    }
+    
+    const selectedItemId = selectedItem.value;
+    const selectedClass = gradeClassEl.value;
+    const totalMarks = selectedItem.dataset.max;
+
+    const gradeRecords = [];
+    
+    document.querySelectorAll('#gradesTableBody tr').forEach(row => {
+        const studentName = row.cells[0].textContent;
+        const scoreInput = row.cells[1].querySelector('.score-input');
+        const score = parseInt(scoreInput.value);
+
+        if (!isNaN(score) && scoreInput.value.trim() !== '' && score >= 0 && score <= totalMarks) {
+             gradeRecords.push({ 
+                student: studentName, 
+                score: score, 
+                max: totalMarks 
+            });
+        }
+    });
+
+    if (gradeRecords.length === 0) {
+        updateStatus("Nothing to save.", 'error');
+        return;
+    }
+    
+    updateStatus('Saving student grades to the Cloud...', 'info');
+
+    try {
+        const docId = `${selectedItemId}_${selectedClass}`; 
+        
+        await db.collection(GRADES_COLLECTION).doc(docId).set({
+            gradingItemId: selectedItemId,
+            gradingItemName: selectedItem.textContent,
+            class: selectedClass,
+            totalMarks: totalMarks,
+            grades: gradeRecords,
+            savedBy: auth.currentUser.email,
+            savedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        updateStatus(`SUCCESS! ${gradeRecords.length} grades saved for ${selectedClass}.`, 'success');
+    } catch (error) {
+        console.error("Firebase Grade Save Error:", error);
+        updateStatus(`ERROR! Failed to save grades: ${error.message}`, 'error');
+    }
 }
 
-// --- 6. PARENT PORTAL LOGIC (NEW) ---
+
+// --- 6. PARENT PORTAL LOGIC ---
 
 async function handleLookupRecords() {
     if (!auth.currentUser) {
@@ -219,96 +427,4 @@ async function handleLookupRecords() {
     studentNameDisplayEl.textContent = lookupName;
     attendanceSummaryEl.innerHTML = '';
     gradesSummaryBodyEl.innerHTML = '';
-    updateStatus(`Searching for records for ${lookupName} in ${lookupClass}...`, 'info');
-
-    // --- A. Fetch Attendance Records ---
-    try {
-        const attendanceSnapshot = await db.collection(ATTENDANCE_COLLECTION)
-            .where('class', '==', lookupClass)
-            .get();
-
-        let totalAttendanceDays = 0;
-        let presentCount = 0;
-        let absentCount = 0;
-
-        attendanceSnapshot.forEach(doc => {
-            const record = doc.data().records.find(r => r.name === lookupName);
-            if (record) {
-                totalAttendanceDays++;
-                if (record.status === 'Present') {
-                    presentCount++;
-                } else if (record.status === 'Absent') {
-                    absentCount++;
-                }
-            }
-        });
-
-        const presentPct = totalAttendanceDays > 0 ? ((presentCount / totalAttendanceDays) * 100).toFixed(1) : '0';
-        
-        attendanceSummaryEl.innerHTML = `
-            <li>Total Days Marked: <strong>${totalAttendanceDays}</strong></li>
-            <li>Present: <strong>${presentCount}</strong> (${presentPct}%)</li>
-            <li>Absent: <strong>${absentCount}</strong></li>
-            <li style="color: grey;">(Attendance data is aggregated across all recorded days in the class.)</li>
-        `;
-        
-    } catch (error) {
-        updateStatus(`Error retrieving attendance: ${error.message}`, 'error');
-    }
-
-
-    // --- B. Fetch Grades Records ---
-    try {
-        const gradesSnapshot = await db.collection(GRADES_COLLECTION)
-            .where('class', '==', lookupClass)
-            .get();
-
-        if (gradesSnapshot.empty) {
-            gradesSummaryBodyEl.innerHTML = `<tr><td colspan="3">No grades found for this class.</td></tr>`;
-        }
-
-        gradesSnapshot.forEach(doc => {
-            const gradeRecord = doc.data().grades.find(g => g.student === lookupName);
-            if (gradeRecord) {
-                const row = gradesSummaryBodyEl.insertRow();
-                row.insertCell(0).textContent = doc.data().gradingItemName.split(':')[1].trim(); // Get test name only
-                row.insertCell(1).textContent = gradeRecord.score;
-                row.insertCell(2).textContent = gradeRecord.max;
-            }
-        });
-
-        if (gradesSummaryBodyEl.children.length === 0) {
-             gradesSummaryBodyEl.innerHTML = `<tr><td colspan="3">Student not found in any saved grade entries.</td></tr>`;
-        }
-        
-    } catch (error) {
-         updateStatus(`Error retrieving grades: ${error.message}`, 'error');
-    }
-    
-    updateStatus(`Records successfully loaded for ${lookupName}.`, 'success');
-}
-
-
-// --- 7. EVENT LISTENERS & INITIAL SETUP ---
-
-// Authentication Buttons
-registerBtn.addEventListener('click', handleRegister);
-loginBtn.addEventListener('click', handleLogin);
-logoutBtn.addEventListener('click', handleLogout);
-
-// Module Tabs
-tabBtns.forEach(btn => {
-    btn.addEventListener('click', () => switchModule(btn.getAttribute('data-module')));
-});
-
-// Attendance Module
-loadStudentsBtn.addEventListener('click', handleLoadStudents);
-saveAttendanceBtn.addEventListener('click', handleSaveAttendance);
-
-// Gradebook Module
-addGradeItemBtn.addEventListener('click', handleAddGradeItem);
-loadGradeStudentsBtn.addEventListener('click', handleLoadGradeStudents);
-saveGradesBtn.addEventListener('click', handleSaveGrades);
-
-// Parent Portal Module (NEW)
-lookupBtn.addEventListener('click', handleLookupRecords);
+    updateStatus(`Searching for records for ${lookupName} in ${lookup
