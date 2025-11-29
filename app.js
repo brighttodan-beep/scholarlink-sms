@@ -27,6 +27,16 @@ const GRADING_ITEM_COLLECTION = "gradingItems";
 const GRADES_COLLECTION = "grades";
 
 
+// --- CONFIGURABLE SYSTEM VARIABLES (NEW) ---
+const SCHOOL_CLASSES = [
+    "KG 1", "P 1", "P 2", "P 3", "P 4", "P 5", "P 6", 
+    "JHS 1", "JHS 2", "JHS 3"
+];
+
+const DUMMY_STUDENTS = [
+    "Kwame Nkrumah", "Yaa Asantewaa", "John Kufuor", "Ama Ghana", "Kofi Annan"
+];
+
 // --- 1. DOM Element References ---
 const authStatusEl = document.getElementById('auth-status');
 const authScreenEl = document.getElementById('auth-screen');
@@ -71,7 +81,7 @@ const studentNameDisplayEl = document.getElementById('studentNameDisplay');
 const attendanceSummaryEl = document.getElementById('attendanceSummary');
 const gradesSummaryBodyEl = document.getElementById('gradesSummaryBody');
 
-// Headmaster Dashboard References (NEW)
+// Headmaster Dashboard References
 const totalTeachersEl = document.getElementById('totalTeachers');
 const totalAttendanceDaysEl = document.getElementById('totalAttendanceDays');
 const avgAttendanceRateEl = document.getElementById('avgAttendanceRate');
@@ -91,6 +101,22 @@ function updateStatus(message, type = 'info') {
     authStatusEl.style.color = colors[type].text;
 }
 
+function populateClassDropdowns() {
+    // Collect all class dropdown elements
+    const classSelects = [attClassEl, gradeClassEl, lookupClassEl];
+    
+    classSelects.forEach(selectEl => {
+        selectEl.innerHTML = ''; // Clear existing options
+        SCHOOL_CLASSES.forEach(className => {
+            const option = document.createElement('option');
+            // Use value without spaces for cleaner database IDs/keys
+            option.value = className.replace(/\s/g, ''); 
+            option.textContent = className;
+            selectEl.appendChild(option);
+        });
+    });
+}
+
 function switchModule(moduleId) {
     moduleSections.forEach(sec => sec.classList.remove('active'));
     document.getElementById(moduleId).classList.add('active');
@@ -104,14 +130,14 @@ function switchModule(moduleId) {
     
     if (moduleId === 'grade') {
         loadGradingItems();
-    } else if (moduleId === 'headmaster-dashboard') { // New Dashboard Handler
+    } else if (moduleId === 'headmaster-dashboard') {
         loadDashboardSummary(); 
     }
     
     updateStatus(`Module ready: ${moduleId}.`);
 }
 
-// --- 3. AUTHENTICATION LOGIC (UNCHANGED) ---
+// --- 3. AUTHENTICATION LOGIC ---
 
 auth.onAuthStateChanged(user => {
     if (user) {
@@ -168,11 +194,7 @@ function handleLogout() {
 }
 
 
-// --- 4. ATTENDANCE LOGIC (UNCHANGED) ---
-
-const DUMMY_STUDENTS = [
-    "Kwame Nkrumah", "Yaa Asantewaa", "John Kufuor", "Ama Ghana", "Kofi Annan"
-];
+// --- 4. ATTENDANCE LOGIC ---
 
 function renderAttendanceTable(students) {
     attendanceTableBody.innerHTML = ''; 
@@ -252,7 +274,7 @@ async function handleSaveAttendance() {
 }
 
 
-// --- 5. GRADEBOOK LOGIC (UNCHANGED) ---
+// --- 5. GRADEBOOK LOGIC ---
 
 async function handleAddGradeItem() {
     if (!auth.currentUser) {
@@ -413,7 +435,7 @@ async function handleSaveGrades() {
 }
 
 
-// --- 6. PARENT PORTAL LOGIC (UNCHANGED) ---
+// --- 6. PARENT PORTAL LOGIC ---
 
 async function handleLookupRecords() {
     if (!auth.currentUser) {
@@ -503,7 +525,7 @@ async function handleLookupRecords() {
 }
 
 
-// --- 7. HEADMASTER DASHBOARD LOGIC (NEW) ---
+// --- 7. HEADMASTER DASHBOARD LOGIC ---
 
 async function loadDashboardSummary() {
     if (!auth.currentUser) return;
@@ -511,8 +533,6 @@ async function loadDashboardSummary() {
 
     try {
         // A. Teachers Count (Placeholder/Estimate from Auth)
-        // NOTE: Firebase does not allow direct fetching of all Auth users in client-side code for security. 
-        // We'll use a simple estimation or placeholder for now.
         totalTeachersEl.textContent = '2+ (Based on current log-ins)';
 
 
@@ -586,3 +606,6 @@ saveGradesBtn.addEventListener('click', handleSaveGrades);
 
 // Parent Portal Module
 lookupBtn.addEventListener('click', handleLookupRecords);
+
+// Call setup functions (Populates all class dropdowns on load)
+populateClassDropdowns();
