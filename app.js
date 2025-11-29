@@ -265,10 +265,10 @@ async function handleAddGradeItem() {
     
     updateStatus(`Adding new grading item: ${itemName}...`, 'info');
     
-    try {
+    try {t
         // Use set with a specific ID to ensure no duplicates for the current user/item combo
-        const docId = `${auth.currentUser.uid}_${subject}_${itemName.replace(/\s/g, '_')}`;
-        await db.collection(GRADING_ITEM_COLLECTION).doc(docId).set(itemData);
+        // TEMPORARY FIX: Load ALL items to bypass the missing index issue
+const snapshot = await db.collection(GRADING_ITEM_COLLECTION).get();
         
         updateStatus(`SUCCESS! Grading item '${itemName}' added.`, 'success');
         
@@ -424,3 +424,4 @@ saveAttendanceBtn.addEventListener('click', handleSaveAttendance);
 addGradeItemBtn.addEventListener('click', handleAddGradeItem);
 loadGradeStudentsBtn.addEventListener('click', handleLoadGradeStudents);
 saveGradesBtn.
+
