@@ -1,4 +1,4 @@
-// main.js - Main logic for ScholarLink SMS (now supporting Multi-Page Architecture)
+// main.js - Main logic for ScholarLink SMS (Firebase-Controlled Initialization)
 
 // --- FIREBASE CONFIGURATION & INITIALIZATION ---
 
@@ -119,12 +119,14 @@ function populateClassDropdowns() {
 
 function switchModule(moduleId) {
     // This logic only runs on app.html
+    if (!moduleSections || moduleSections.length === 0) return; // Safety check
+
     moduleSections.forEach(sec => sec.classList.remove('active'));
     document.getElementById(moduleId).classList.add('active');
 
     tabBtns.forEach(btn => {
         btn.classList.remove('active');
-        if (btn.getAttribute('data-module') === moduleId) {
+        if (btn && btn.getAttribute('data-module') === moduleId) {
             btn.classList.add('active');
         }
     });
@@ -141,25 +143,70 @@ function switchModule(moduleId) {
 
 // --- 3. AUTHENTICATION LOGIC ---
 
+// Application Initialization Function (Runs only on the app.html page)
+function initializeApplicationLogic(user) {
+    if (document.title.includes("Application")) {
+        
+        // 1. Display User Info and Status
+        userNameEl.textContent = user.email;
+        updateStatus(`Welcome back, ${user.email}!`, 'success');
+        
+        // 2. Set up all App Event Listeners
+        populateClassDropdowns();
+
+        // Module Tabs
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => switchModule(btn.getAttribute('data-module')));
+        });
+
+        // Logout Button
+        logoutBtn.addEventListener('click', handleLogout);
+
+        // Attendance Module
+        loadStudentsBtn.addEventListener('click', handleLoadStudents);
+        saveAttendanceBtn.addEventListener('click', handleSaveAttendance);
+
+        // Gradebook Module
+        addGradeItemBtn.addEventListener('click', handleAddGradeItem);
+        loadGradeStudentsBtn.addEventListener('click', handleLoadGradeStudents);
+        saveGradesBtn.addEventListener('click', handleSaveGrades);
+
+        // Parent Portal Module
+        lookupBtn.addEventListener('click', handleLookupRecords);
+
+        // Headmaster Dashboard Management
+        addStudentBtn.addEventListener('click', handleAddStudent);
+        newStudentClassEl.addEventListener('change', loadStudentsByClass);
+        
+        // Start on the Attendance Module on load
+        switchModule('attendance');
+    }
+}
+
+
+// Primary listener that handles login/logout and initialization
 auth.onAuthStateChanged(user => {
     // 1. If user is logged in:
     if (user) {
-        // If the user is on the login page (index.html), redirect to the app page.
+        // If on the Login page (index.html), redirect to the app page.
         if (document.title.includes("Login")) {
             window.location.href = 'app.html';
         } 
-        // If the user is on the app page (app.html), populate user info.
+        // If on the Application page (app.html), initialize the app structure.
         else if (document.title.includes("Application")) {
-            // Check if element exists before accessing it (Safety check for App page)
-            if (userNameEl) { 
-                userNameEl.textContent = user.email;
-                updateStatus(`Welcome back, ${user.email}!`, 'success');
-            }
+             // 🔑 NEW FIX: Run initialization ONLY when the user is confirmed AND the DOM is ready.
+             // We use a small check here to ensure the core elements exist first.
+             if (document.readyState === 'complete') {
+                initializeApplicationLogic(user);
+             } else {
+                 // Wait for the full page load before initializing the app structure
+                 window.addEventListener('load', () => initializeApplicationLogic(user));
+             }
         }
     } 
     // 2. If user is NOT logged in:
     else {
-        // If the user is on the app page (app.html), redirect to the login page.
+        // If on the Application page (app.html), redirect to the login page.
         if (document.title.includes("Application")) {
             window.location.href = 'index.html';
         }
@@ -179,7 +226,7 @@ async function handleRegister() {
     try {
         updateStatus('Creating new account...', 'info');
         await auth.createUserWithEmailAndPassword(email, password);
-        // auth.onAuthStateChanged will handle the redirection on success
+        // auth.onAuthStateChanged handles the redirection on success
     } catch (error) {
         updateStatus(`Registration Error: ${error.message}`, 'error');
     }
@@ -197,7 +244,7 @@ async function handleLogin() {
     try {
         updateStatus('Signing in...', 'info');
         await auth.signInWithEmailAndPassword(email, password);
-        // auth.onAuthStateChanged will handle the redirection on success
+        // auth.onAuthStateChanged handles the redirection on success
     } catch (error) {
         updateStatus(`Login Error: ${error.message}`, 'error');
     }
@@ -205,11 +252,12 @@ async function handleLogin() {
 
 function handleLogout() {
     auth.signOut();
-    // auth.onAuthStateChanged will handle the redirection back to index.html
+    // auth.onAuthStateChanged handles the redirection back to index.html
 }
 
 
-// --- 4. ATTENDANCE LOGIC ---
+// --- 4. ATTENDANCE LOGIC (Unchanged) ---
+// ... (Your attendance logic remains here)
 
 function renderAttendanceTable(students) {
     attendanceTableBody.innerHTML = ''; 
@@ -303,7 +351,7 @@ async function handleSaveAttendance() {
 }
 
 
-// --- 5. GRADEBOOK LOGIC ---
+// --- 5. GRADEBOOK LOGIC (Unchanged) ---
 
 async function handleAddGradeItem() {
     if (!auth.currentUser) return;
@@ -353,13 +401,13 @@ async function loadGradingItems() {
         
         snapshot.forEach(doc => {
             const item = doc.data();
-            if (item.createdBy === auth.currentUser.email) { 
+            // Removed: if (item.createdBy === auth.currentUser.email) { // We can let everyone see grading items for now
                 const option = document.createElement('option');
                 option.value = doc.id;
                 option.textContent = `${item.subject}: ${item.name} (Max: ${item.totalMarks})`;
                 option.dataset.max = item.totalMarks;
                 gradingItemSelectEl.appendChild(option);
-            }
+            // }
         });
         
         updateStatus(`Loaded ${gradingItemSelectEl.options.length - 1} grading items.`);
@@ -475,7 +523,7 @@ async function handleSaveGrades() {
 }
 
 
-// --- 6. PARENT PORTAL LOGIC ---
+// --- 6. PARENT PORTAL LOGIC (Unchanged) ---
 
 async function handleLookupRecords() {
     if (!auth.currentUser) return;
@@ -562,7 +610,7 @@ async function handleLookupRecords() {
 }
 
 
-// --- 7. HEADMASTER DASHBOARD LOGIC (Includes Student Management) ---
+// --- 7. HEADMASTER DASHBOARD LOGIC (Unchanged) ---
 
 async function handleAddStudent() {
     if (!auth.currentUser) return;
@@ -673,50 +721,10 @@ async function loadDashboardSummary() {
 }
 
 
-// --- 8. EVENT LISTENERS & INITIAL SETUP ---
+// --- 8. EVENT LISTENERS & INITIAL SETUP (Login Page Only) ---
 
-// Main Application Initialization Function
-function initializeApplication() {
-    // Check which page we are on to attach correct listeners
-    if (document.title.includes("Login")) {
-        // Authentication Buttons
-        loginBtn.addEventListener('click', handleLogin);
-        registerBtn.addEventListener('click', handleRegister);
-
-    } else if (document.title.includes("Application")) {
-        
-        // Populate all dropdowns first
-        populateClassDropdowns();
-
-        // Module Tabs
-        tabBtns.forEach(btn => {
-            btn.addEventListener('click', () => switchModule(btn.getAttribute('data-module')));
-        });
-
-        // Logout Button
-        logoutBtn.addEventListener('click', handleLogout);
-
-        // Attendance Module
-        loadStudentsBtn.addEventListener('click', handleLoadStudents);
-        saveAttendanceBtn.addEventListener('click', handleSaveAttendance);
-
-        // Gradebook Module
-        addGradeItemBtn.addEventListener('click', handleAddGradeItem);
-        loadGradeStudentsBtn.addEventListener('click', handleLoadGradeStudents);
-        saveGradesBtn.addEventListener('click', handleSaveGrades);
-
-        // Parent Portal Module
-        lookupBtn.addEventListener('click', handleLookupRecords);
-
-        // Headmaster Dashboard Management
-        addStudentBtn.addEventListener('click', handleAddStudent);
-        newStudentClassEl.addEventListener('change', loadStudentsByClass);
-        
-        // Start on the Attendance Module on load
-        switchModule('attendance');
-    }
+if (document.title.includes("Login")) {
+    // Attach event listeners for the login page elements immediately
+    loginBtn.addEventListener('click', handleLogin);
+    registerBtn.addEventListener('click', handleRegister);
 }
-
-// 🔑 NEW FIX: Wait for the entire page structure to load before running initialization 
-// This resolves the blank screen issue on app.html
-window.addEventListener('load', initializeApplication);
