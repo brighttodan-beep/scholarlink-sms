@@ -1,5 +1,4 @@
-// main.js - FINAL SINGLE-PAGE APPLICATION (SPA) VERSION.
-// All logic consolidated into index.html, using show/hide for authentication flow.
+// main.js - FINAL MULTI-TENANCY VERSION.
 
 // --- FIREBASE CONFIGURATION & INITIALIZATION ---
 
@@ -27,7 +26,11 @@ const STUDENTS_COLLECTION = "students";
 const ATTENDANCE_COLLECTION = "attendanceRecords";
 const GRADING_ITEM_COLLECTION = "gradingItems";
 const GRADES_COLLECTION = "grades";
+const USERS_COLLECTION = "users"; // NEW COLLECTION
 
+// --- GLOBAL MULTI-TENANCY VARIABLES ---
+let userSchoolId = null; 
+let userRole = null;    
 
 // --- CONFIGURABLE SYSTEM VARIABLES ---
 const SCHOOL_CLASSES = [
@@ -46,7 +49,6 @@ const authStatusEl = document.getElementById('auth-status');
 const loginEmailEl = document.getElementById('loginEmail');
 const loginPasswordEl = document.getElementById('loginPassword');
 const loginBtn = document.getElementById('loginBtn');
-const registerBtn = document.getElementById('registerBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 const userNameEl = document.getElementById('userName');
 
@@ -54,7 +56,7 @@ const userNameEl = document.getElementById('userName');
 const tabBtns = document.querySelectorAll('.tab-btn');
 const moduleSections = document.querySelectorAll('.module-section'); 
 
-// Module specific references (all assumed to exist on index.html)
+// Module specific references
 const attClassEl = document.getElementById('attClass');
 const attDateEl = document.getElementById('attDate');
 const loadStudentsBtn = document.getElementById('loadStudentsBtn');
@@ -131,50 +133,77 @@ function switchModule(moduleId) {
         loadGradingItems();
     } else if (moduleId === 'headmaster-dashboard') {
         loadDashboardSummary(); 
-        loadStudentsByClass();
+        // Loads students for the currently selected class in the dropdown
+        if(newStudentClassEl) loadStudentsByClass(newStudentClassEl.value); 
     }
     
     updateStatus(`Module ready: ${moduleId}.`);
 }
 
-// --- 3. AUTHENTICATION LOGIC (Modified for SPA) ---
+// --- 3. AUTHENTICATION LOGIC (Updated for Multi-Tenancy) ---
 
-function initializeApplicationLogic(user) {
-    // 1. Swap Views: Hide login, Show App
-    if (authSectionEl) authSectionEl.classList.add('hidden');
-    if (appSectionEl) appSectionEl.classList.remove('hidden');
+async function initializeApplicationLogic(user) {
+    // 1. Fetch User Profile (CRITICAL NEW STEP)
+    try {
+        // Attempt to retrieve the user's role and school ID from the 'users' collection
+        const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
+        if (!userDoc.exists) {
+            // If the user's UID doesn't exist in the 'users' collection, they are not provisioned
+            alert("Account not provisioned. Please contact your school administrator.");
+            handleLogout(); 
+            return;
+        }
+        
+        const userData = userDoc.data();
+        userSchoolId = userData.schoolId; // Store the ID for all subsequent data queries
+        userRole = userData.role;       // Store the Role for RBAC checks
+        
+        // --- End New Steps ---
 
-    // 2. Display User Info and Status
-    if (userNameEl) userNameEl.textContent = user.email;
-    updateStatus(`Welcome back, ${user.email}!`, 'success');
-    
-    // 3. Set up all App Event Listeners
-    populateClassDropdowns();
+        // 2. Swap Views: Hide login, Show App
+        if (authSectionEl) authSectionEl.classList.add('hidden');
+        if (appSectionEl) appSectionEl.classList.remove('hidden');
 
-    // Module Tabs
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => switchModule(btn.getAttribute('data-module')));
-    });
+        // 3. Display User Info and Status
+        if (userNameEl) userNameEl.textContent = `${user.email} (${userRole} | ${userSchoolId})`;
+        updateStatus(`Welcome back, ${user.email}! Role: ${userRole}. School: ${userSchoolId}`, 'success');
+        
+        // 4. Set up all App Event Listeners (remains the same as before)
+        populateClassDropdowns();
 
-    // Logout Button
-    if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+        // Module Tabs
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => switchModule(btn.getAttribute('data-module')));
+        });
 
-    // Module specific listeners (Check if element exists before adding listener)
-    if (loadStudentsBtn) loadStudentsBtn.addEventListener('click', handleLoadStudents);
-    if (saveAttendanceBtn) saveAttendanceBtn.addEventListener('click', handleSaveAttendance);
-    if (addGradeItemBtn) addGradeItemBtn.addEventListener('click', handleAddGradeItem);
-    if (loadGradeStudentsBtn) loadGradeStudentsBtn.addEventListener('click', handleLoadGradeStudents);
-    if (saveGradesBtn) saveGradesBtn.addEventListener('click', handleSaveGrades);
-    if (lookupBtn) lookupBtn.addEventListener('click', handleLookupRecords);
-    if (addStudentBtn) addStudentBtn.addEventListener('click', handleAddStudent);
-    if (newStudentClassEl) newStudentClassEl.addEventListener('change', loadStudentsByClass);
-    
-    // Start on the Attendance Module on load
-    switchModule('attendance');
+        // Logout Button
+        if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+
+        // Module specific listeners 
+        if (loadStudentsBtn) loadStudentsBtn.addEventListener('click', handleLoadStudents);
+        if (saveAttendanceBtn) saveAttendanceBtn.addEventListener('click', handleSaveAttendance);
+        if (addGradeItemBtn) addGradeItemBtn.addEventListener('click', handleAddGradeItem);
+        if (loadGradeStudentsBtn) loadGradeStudentsBtn.addEventListener('click', handleLoadGradeStudents);
+        if (saveGradesBtn) saveGradesBtn.addEventListener('click', handleSaveGrades);
+        if (lookupBtn) lookupBtn.addEventListener('click', handleLookupRecords);
+        if (addStudentBtn) addStudentBtn.addEventListener('click', handleAddStudent);
+        if (newStudentClassEl) newStudentClassEl.addEventListener('change', loadStudentsByClass);
+        
+        // Start on the Attendance Module on load
+        switchModule('attendance');
+    } catch (error) {
+        console.error("Initialization Error:", error);
+        updateStatus(`Fatal Initialization Error: ${error.message}`, 'error');
+        handleLogout();
+    }
 }
 
 function resetApplicationView() {
-    // 1. Swap Views: Hide App, Show Login
+    // 1. Clear global state
+    userSchoolId = null;
+    userRole = null;
+    
+    // 2. Swap Views: Hide App, Show Login
     if (authSectionEl) authSectionEl.classList.remove('hidden');
     if (appSectionEl) appSectionEl.classList.add('hidden');
     updateStatus('You have been logged out. Please log in.', 'info');
@@ -192,24 +221,7 @@ auth.onAuthStateChanged(user => {
     }
 });
 
-
-async function handleRegister() {
-    const email = loginEmailEl.value;
-    const password = loginPasswordEl.value;
-    
-    if (email.trim() === '' || password.trim() === '') {
-        updateStatus("Error: Email and Password are required.", 'error');
-        return;
-    }
-
-    try {
-        updateStatus('Creating new account...', 'info');
-        await auth.createUserWithEmailAndPassword(email, password);
-        // auth.onAuthStateChanged will automatically call initializeApplicationLogic
-    } catch (error) {
-        updateStatus(`Registration Error: ${error.message}`, 'error');
-    }
-}
+// --- REGISTER FUNCTION IS REMOVED FOR SECURITY ---
 
 async function handleLogin() {
     const email = loginEmailEl.value;
@@ -222,8 +234,9 @@ async function handleLogin() {
     
     try {
         updateStatus('Signing in...', 'info');
+        // This signs the user into Firebase Auth
         await auth.signInWithEmailAndPassword(email, password);
-        // auth.onAuthStateChanged will automatically call initializeApplicationLogic
+        // auth.onAuthStateChanged will automatically call initializeApplicationLogic to check provisioning
     } catch (error) {
         updateStatus(`Login Error: ${error.message}`, 'error');
     }
@@ -235,7 +248,7 @@ function handleLogout() {
 }
 
 
-// --- 4. ATTENDANCE LOGIC ---
+// --- 4. ATTENDANCE LOGIC (UPDATED WITH schoolId FILTER/SAVE) ---
 
 function renderAttendanceTable(students) {
     if (!attendanceTableBody) return;
@@ -257,7 +270,7 @@ function renderAttendanceTable(students) {
 
 
 async function handleLoadStudents() {
-    if (!auth.currentUser || !attClassEl || !attDateEl || !attendanceTableBody) return;
+    if (!auth.currentUser || !attClassEl || !attDateEl || !attendanceTableBody || !userSchoolId) return;
     const selectedClass = attClassEl.value;
     const selectedDate = attDateEl.value;
 
@@ -270,6 +283,8 @@ async function handleLoadStudents() {
     
     try {
         const snapshot = await db.collection(STUDENTS_COLLECTION)
+            // FILTER BY SCHOOL ID
+            .where('schoolId', '==', userSchoolId) 
             .where('class', '==', selectedClass)
             .orderBy('name', 'asc')
             .get();
@@ -277,7 +292,7 @@ async function handleLoadStudents() {
         const students = snapshot.docs.map(doc => doc.data());
         
         if (students.length === 0) {
-            updateStatus(`No students found for ${selectedClass}. Please add students via the Dashboard.`, 'error');
+            updateStatus(`No students found for ${selectedClass} in your school.`, 'error');
             attendanceTableBody.innerHTML = '<tr><td colspan="2">No students found.</td></tr>';
             if (saveAttendanceBtn) saveAttendanceBtn.disabled = true;
             return;
@@ -292,7 +307,7 @@ async function handleLoadStudents() {
 }
 
 async function handleSaveAttendance() {
-    if (!auth.currentUser || !attClassEl || !attDateEl || !attendanceTableBody) return;
+    if (!auth.currentUser || !attClassEl || !attDateEl || !attendanceTableBody || !userSchoolId) return;
 
     const selectedClass = attClassEl.value;
     const selectedDate = attDateEl.value;
@@ -312,12 +327,14 @@ async function handleSaveAttendance() {
     updateStatus('Saving attendance records to the Cloud...', 'info');
     
     try {
-        const docId = `${selectedClass}_${selectedDate}`;
+        const docId = `${userSchoolId}_${selectedClass}_${selectedDate}`;
         
         await db.collection(ATTENDANCE_COLLECTION).doc(docId).set({
             class: selectedClass,
             date: selectedDate,
             records: records,
+            // SAVE SCHOOL ID
+            schoolId: userSchoolId, 
             savedBy: auth.currentUser.email,
             savedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
@@ -330,10 +347,10 @@ async function handleSaveAttendance() {
 }
 
 
-// --- 5. GRADEBOOK LOGIC ---
+// --- 5. GRADEBOOK LOGIC (UPDATED WITH schoolId FILTER/SAVE) ---
 
 async function handleAddGradeItem() {
-    if (!auth.currentUser || !gradeSubjectEl || !gradeItemNameEl || !totalMarksEl) return;
+    if (!auth.currentUser || !gradeSubjectEl || !gradeItemNameEl || !totalMarksEl || !userSchoolId) return;
     
     const subject = gradeSubjectEl.value;
     const itemName = gradeItemNameEl.value.trim();
@@ -348,6 +365,8 @@ async function handleAddGradeItem() {
         subject: subject,
         name: itemName,
         totalMarks: totalMarks,
+        // SAVE SCHOOL ID
+        schoolId: userSchoolId, 
         createdBy: auth.currentUser.email,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
@@ -355,7 +374,7 @@ async function handleAddGradeItem() {
     updateStatus(`Adding new grading item: ${itemName}...`, 'info');
     
     try {
-        const docId = `${auth.currentUser.uid}_${subject}_${itemName.replace(/\s/g, '_')}`;
+        const docId = `${userSchoolId}_${subject}_${itemName.replace(/\s/g, '_')}`;
         await db.collection(GRADING_ITEM_COLLECTION).doc(docId).set(itemData);
         
         updateStatus(`SUCCESS! Grading item '${itemName}' added.`, 'success');
@@ -371,10 +390,15 @@ async function handleAddGradeItem() {
 
 
 async function loadGradingItems() {
-    if (!auth.currentUser || !gradingItemSelectEl) return;
+    if (!auth.currentUser || !gradingItemSelectEl || !userSchoolId) return;
     
     try {
-        const snapshot = await db.collection(GRADING_ITEM_COLLECTION).get();
+        const query = db.collection(GRADING_ITEM_COLLECTION)
+            // FILTER BY SCHOOL ID
+            .where('schoolId', '==', userSchoolId)
+            .orderBy('createdAt', 'desc');
+
+        const snapshot = await query.get();
         
         gradingItemSelectEl.innerHTML = '<option value="">-- Select Test/Assignment --</option>';
         
@@ -395,7 +419,7 @@ async function loadGradingItems() {
 }
 
 async function handleLoadGradeStudents() {
-     if (!auth.currentUser || !gradingItemSelectEl || !gradeClassEl || !gradesTableBody) return;
+     if (!auth.currentUser || !gradingItemSelectEl || !gradeClassEl || !gradesTableBody || !userSchoolId) return;
     
     const selectedItem = gradingItemSelectEl.options[gradingItemSelectEl.selectedIndex];
     
@@ -411,6 +435,8 @@ async function handleLoadGradeStudents() {
     
     try {
         const snapshot = await db.collection(STUDENTS_COLLECTION)
+            // FILTER BY SCHOOL ID
+            .where('schoolId', '==', userSchoolId) 
             .where('class', '==', selectedClass)
             .orderBy('name', 'asc')
             .get();
@@ -444,7 +470,7 @@ async function handleLoadGradeStudents() {
 
 
 async function handleSaveGrades() {
-    if (!auth.currentUser || !gradingItemSelectEl || !gradeClassEl) return;
+    if (!auth.currentUser || !gradingItemSelectEl || !gradeClassEl || !userSchoolId) return;
 
     const selectedItem = gradingItemSelectEl.options[gradingItemSelectEl.selectedIndex];
     
@@ -489,6 +515,8 @@ async function handleSaveGrades() {
             class: selectedClass,
             totalMarks: totalMarks,
             grades: gradeRecords,
+            // SAVE SCHOOL ID
+            schoolId: userSchoolId, 
             savedBy: auth.currentUser.email,
             savedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
@@ -501,10 +529,10 @@ async function handleSaveGrades() {
 }
 
 
-// --- 6. PARENT PORTAL LOGIC ---
+// --- 6. PARENT PORTAL LOGIC (UPDATED WITH schoolId FILTER) ---
 
 async function handleLookupRecords() {
-    if (!auth.currentUser || !lookupNameEl || !lookupClassEl || !studentNameDisplayEl || !attendanceSummaryEl || !gradesSummaryBodyEl) return;
+    if (!auth.currentUser || !lookupNameEl || !lookupClassEl || !studentNameDisplayEl || !attendanceSummaryEl || !gradesSummaryBodyEl || !userSchoolId) return;
     
     const lookupName = lookupNameEl.value.trim();
     const lookupClass = lookupClassEl.value;
@@ -523,6 +551,8 @@ async function handleLookupRecords() {
     // --- A. Fetch Attendance Records ---
     try {
         const attendanceSnapshot = await db.collection(ATTENDANCE_COLLECTION)
+            // FILTER BY SCHOOL ID
+            .where('schoolId', '==', userSchoolId) 
             .where('class', '==', lookupClass)
             .get();
 
@@ -559,6 +589,8 @@ async function handleLookupRecords() {
     // --- B. Fetch Grades Records ---
     try {
         const gradesSnapshot = await db.collection(GRADES_COLLECTION)
+            // FILTER BY SCHOOL ID
+            .where('schoolId', '==', userSchoolId) 
             .where('class', '==', lookupClass)
             .get();
 
@@ -588,10 +620,10 @@ async function handleLookupRecords() {
 }
 
 
-// --- 7. HEADMASTER DASHBOARD LOGIC ---
+// --- 7. HEADMASTER DASHBOARD LOGIC (UPDATED WITH schoolId FILTER/SAVE) ---
 
 async function handleAddStudent() {
-    if (!auth.currentUser || !newStudentNameEl || !newStudentClassEl) return;
+    if (!auth.currentUser || !newStudentNameEl || !newStudentClassEl || !userSchoolId) return;
     
     const name = newStudentNameEl.value.trim();
     const classValue = newStudentClassEl.value;
@@ -606,6 +638,8 @@ async function handleAddStudent() {
         await db.collection(STUDENTS_COLLECTION).add({
             name: name,
             class: classValue,
+            // SAVE SCHOOL ID
+            schoolId: userSchoolId, 
             addedBy: auth.currentUser.email,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
@@ -619,10 +653,12 @@ async function handleAddStudent() {
 }
 
 async function loadStudentsByClass(selectedClass = newStudentClassEl.value) {
-    if (!auth.currentUser || !studentListBodyEl || !newStudentClassEl) return;
+    if (!auth.currentUser || !studentListBodyEl || !newStudentClassEl || !userSchoolId) return;
     
     try {
         const snapshot = await db.collection(STUDENTS_COLLECTION)
+            // FILTER BY SCHOOL ID
+            .where('schoolId', '==', userSchoolId) 
             .where('class', '==', selectedClass)
             .orderBy('name', 'asc')
             .get();
@@ -645,7 +681,7 @@ async function loadStudentsByClass(selectedClass = newStudentClassEl.value) {
 
 
 async function loadDashboardSummary() {
-    if (!auth.currentUser || !totalTeachersEl || !totalAttendanceDaysEl || !avgAttendanceRateEl || !recentGradesBodyEl) return;
+    if (!auth.currentUser || !totalTeachersEl || !totalAttendanceDaysEl || !avgAttendanceRateEl || !recentGradesBodyEl || !userSchoolId) return;
     updateStatus('Loading School Dashboard Summary...', 'info');
 
     try {
@@ -653,7 +689,11 @@ async function loadDashboardSummary() {
         totalTeachersEl.textContent = '2+ (Based on current log-ins)';
 
         // B. Total Attendance Summary
-        const attendanceSnapshot = await db.collection(ATTENDANCE_COLLECTION).get();
+        const attendanceSnapshot = await db.collection(ATTENDANCE_COLLECTION)
+            // FILTER BY SCHOOL ID
+            .where('schoolId', '==', userSchoolId) 
+            .get();
+            
         let totalDays = attendanceSnapshot.docs.length;
         let totalStudentsMarked = 0;
         let totalPresent = 0;
@@ -672,6 +712,8 @@ async function loadDashboardSummary() {
 
         // C. Recent Grades (Last 5 Entries)
         const gradesSnapshot = await db.collection(GRADES_COLLECTION)
+            // FILTER BY SCHOOL ID
+            .where('schoolId', '==', userSchoolId) 
             .orderBy('savedAt', 'desc')
             .limit(5)
             .get();
@@ -703,4 +745,4 @@ async function loadDashboardSummary() {
 
 // Attach event listeners for the login page elements immediately
 if (loginBtn) loginBtn.addEventListener('click', handleLogin);
-if (registerBtn) registerBtn.addEventListener('click', handleRegister);
+// REMOVED THE REGISTER BUTTON LISTENER
