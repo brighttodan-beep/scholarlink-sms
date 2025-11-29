@@ -1,4 +1,4 @@
-// main.js - Main logic for ScholarLink SMS (Final Structural Fix)
+// main.js - Final structural fix incorporating Firebase-controlled initialization and manual login redirect.
 
 // --- FIREBASE CONFIGURATION & INITIALIZATION ---
 
@@ -188,14 +188,11 @@ function initializeApplicationLogic(user) {
 auth.onAuthStateChanged(user => {
     // 1. If user is logged in:
     if (user) {
-        // If on the Login page (index.html), redirect to the app page.
-        if (document.title.includes("Login")) {
-            window.location.href = 'app.html';
-        } 
+        // [LOGIN PAGE REDIRECT LOGIC REMOVED: Login page will stay on screen until button is clicked]
+
         // If on the Application page (app.html):
-        else if (document.title.includes("Application")) {
-             // 🔑 FINAL FIX: Add a listener that waits for the *entire* page (including styles, etc.) to load 
-             // before initializing the visual components. This prevents the "blank screen" crash.
+        if (document.title.includes("Application")) {
+             // FIX: Wait for the *entire* page to load before initializing the visual components.
              window.addEventListener('load', () => initializeApplicationLogic(user));
         }
     } 
@@ -210,7 +207,6 @@ auth.onAuthStateChanged(user => {
 
 
 async function handleRegister() {
-    // ... (logic remains the same)
     const email = loginEmailEl.value;
     const password = loginPasswordEl.value;
     
@@ -222,14 +218,14 @@ async function handleRegister() {
     try {
         updateStatus('Creating new account...', 'info');
         await auth.createUserWithEmailAndPassword(email, password);
-        // auth.onAuthStateChanged handles the redirection on success
+        // On success, we perform an explicit redirect just like handleLogin
+        window.location.href = 'app.html';
     } catch (error) {
         updateStatus(`Registration Error: ${error.message}`, 'error');
     }
 }
 
 async function handleLogin() {
-    // ... (logic remains the same)
     const email = loginEmailEl.value;
     const password = loginPasswordEl.value;
     
@@ -241,7 +237,10 @@ async function handleLogin() {
     try {
         updateStatus('Signing in...', 'info');
         await auth.signInWithEmailAndPassword(email, password);
-        // auth.onAuthStateChanged handles the redirection on success
+        
+        // FIX: EXPLICIT REDIRECT ONLY AFTER MANUAL LOGIN SUCCESS
+        window.location.href = 'app.html'; 
+        
     } catch (error) {
         updateStatus(`Login Error: ${error.message}`, 'error');
     }
@@ -253,8 +252,7 @@ function handleLogout() {
 }
 
 
-// --- 4. ATTENDANCE LOGIC (Unchanged) ---
-// ... (All existing module logic functions are unchanged and follow this line)
+// --- 4. ATTENDANCE LOGIC ---
 
 function renderAttendanceTable(students) {
     attendanceTableBody.innerHTML = ''; 
@@ -348,7 +346,7 @@ async function handleSaveAttendance() {
 }
 
 
-// --- 5. GRADEBOOK LOGIC (Unchanged) ---
+// --- 5. GRADEBOOK LOGIC ---
 
 async function handleAddGradeItem() {
     if (!auth.currentUser) return;
@@ -520,7 +518,7 @@ async function handleSaveGrades() {
 }
 
 
-// --- 6. PARENT PORTAL LOGIC (Unchanged) ---
+// --- 6. PARENT PORTAL LOGIC ---
 
 async function handleLookupRecords() {
     if (!auth.currentUser) return;
@@ -607,7 +605,7 @@ async function handleLookupRecords() {
 }
 
 
-// --- 7. HEADMASTER DASHBOARD LOGIC (Unchanged) ---
+// --- 7. HEADMASTER DASHBOARD LOGIC ---
 
 async function handleAddStudent() {
     if (!auth.currentUser) return;
@@ -722,7 +720,6 @@ async function loadDashboardSummary() {
 
 if (document.title.includes("Login")) {
     // Attach event listeners for the login page elements immediately
-    // This is safe because these elements are guaranteed to exist on index.html
     loginBtn.addEventListener('click', handleLogin);
     registerBtn.addEventListener('click', handleRegister);
 }
