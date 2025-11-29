@@ -2,7 +2,7 @@
 
 // --- FIREBASE CONFIGURATION & INITIALIZATION ---
 
-// YOUR UNIQUE firebaseConfig OBJECT IS NOW PASTE HERE!
+// YOUR UNIQUE firebaseConfig OBJECT IS NOW PASTED HERE!
 const firebaseConfig = {
     apiKey: "AIzaSyDt1nGhKNXz6bLfLILUfJ_RnfD45_VgVX0",
     authDomain: "scholarlink-sms-app.firebaseapp.com",
@@ -88,7 +88,6 @@ function switchModule(moduleId) {
         }
     });
     
-    // NEW: Load grading items whenever the Gradebook is opened
     if (moduleId === 'grade') {
         loadGradingItems();
     }
@@ -96,7 +95,7 @@ function switchModule(moduleId) {
     updateStatus(`Module ready: ${moduleId}.`);
 }
 
-// --- 3. AUTHENTICATION LOGIC (UNCHANGED) ---
+// --- 3. AUTHENTICATION LOGIC (UNCORRECTED) ---
 
 auth.onAuthStateChanged(user => {
     if (user) {
@@ -153,7 +152,7 @@ function handleLogout() {
 }
 
 
-// --- 4. ATTENDANCE LOGIC (UNCHANGED) ---
+// --- 4. ATTENDANCE LOGIC (UNCORRECTED) ---
 
 const DUMMY_STUDENTS = [
     "Kwame Nkrumah", "Yaa Asantewaa", "John Kufuor", "Ama Ghana", "Kofi Annan"
@@ -205,8 +204,7 @@ async function handleSaveAttendance() {
     const selectedDate = attDateEl.value;
     const records = [];
     
-    // Logic to gather records
-    document.querySelectorAll('#attendanceTableBody tr').forEach(row => { // Use the correct ID reference
+    document.querySelectorAll('#attendanceTableBody tr').forEach(row => {
         const name = row.cells[0].textContent;
         const status = row.cells[1].querySelector('.status-select').value;
         records.push({ name, status });
@@ -265,10 +263,9 @@ async function handleAddGradeItem() {
     
     updateStatus(`Adding new grading item: ${itemName}...`, 'info');
     
-    try {t
-        // Use set with a specific ID to ensure no duplicates for the current user/item combo
-        // TEMPORARY FIX: Load ALL items to bypass the missing index issue
-const snapshot = await db.collection(GRADING_ITEM_COLLECTION).get();
+    try {
+        const docId = `${auth.currentUser.uid}_${subject}_${itemName.replace(/\s/g, '_')}`;
+        await db.collection(GRADING_ITEM_COLLECTION).doc(docId).set(itemData);
         
         updateStatus(`SUCCESS! Grading item '${itemName}' added.`, 'success');
         
@@ -286,10 +283,8 @@ async function loadGradingItems() {
     if (!auth.currentUser) return;
     
     try {
-        // Fetch only items created by the current user for organization
-        const snapshot = await db.collection(GRADING_ITEM_COLLECTION)
-                                 .where('createdBy', '==', auth.currentUser.email)
-                                 .get();
+        // FIX APPLIED: Removed the .where() filter to bypass the index issue.
+        const snapshot = await db.collection(GRADING_ITEM_COLLECTION).get();
         
         gradingItemSelectEl.innerHTML = '<option value="">-- Select Test/Assignment --</option>';
         
@@ -316,7 +311,6 @@ function handleLoadGradeStudents() {
     
     const selectedItem = gradingItemSelectEl.options[gradingItemSelectEl.selectedIndex];
     
-    // FIX: Check if an item is truly selected by checking the 'value'
     if (!selectedItem || !selectedItem.value) {
         updateStatus("Error: Please create or select a grading item first.", 'error');
         return;
@@ -360,68 +354,9 @@ async function handleSaveGrades() {
 
     const gradeRecords = [];
     
-    // Gather grades from the table
     document.querySelectorAll('#gradesTableBody tr').forEach(row => {
         const studentName = row.cells[0].textContent;
         const scoreInput = row.cells[1].querySelector('.score-input');
         const score = parseInt(scoreInput.value);
 
-        if (!isNaN(score) && scoreInput.value.trim() !== '' && score >= 0 && score <= totalMarks) {
-             gradeRecords.push({ 
-                student: studentName, 
-                score: score, 
-                max: totalMarks 
-            });
-        }
-    });
-
-    if (gradeRecords.length === 0) {
-        updateStatus("Nothing to save.", 'error');
-        return;
-    }
-    
-    updateStatus('Saving student grades to the Cloud...', 'info');
-
-    try {
-        // Create a single document for this class's grades for this specific item
-        const docId = `${selectedItemId}_${selectedClass}`; 
-        
-        await db.collection(GRADES_COLLECTION).doc(docId).set({
-            gradingItemId: selectedItemId,
-            gradingItemName: selectedItem.textContent,
-            class: selectedClass,
-            totalMarks: totalMarks,
-            grades: gradeRecords,
-            savedBy: auth.currentUser.email,
-            savedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-
-        updateStatus(`SUCCESS! ${gradeRecords.length} grades saved for ${selectedClass}.`, 'success');
-    } catch (error) {
-        console.error("Firebase Grade Save Error:", error);
-        updateStatus(`ERROR! Failed to save grades: ${error.message}`, 'error');
-    }
-}
-
-
-// --- 6. EVENT LISTENERS & INITIAL SETUP ---
-
-// Authentication Buttons
-registerBtn.addEventListener('click', handleRegister);
-loginBtn.addEventListener('click', handleLogin);
-logoutBtn.addEventListener('click', handleLogout);
-
-// Module Tabs (uses switchModule)
-tabBtns.forEach(btn => {
-    btn.addEventListener('click', () => switchModule(btn.getAttribute('data-module')));
-});
-
-// Attendance Module
-loadStudentsBtn.addEventListener('click', handleLoadStudents);
-saveAttendanceBtn.addEventListener('click', handleSaveAttendance);
-
-// Gradebook Module (NEW)
-addGradeItemBtn.addEventListener('click', handleAddGradeItem);
-loadGradeStudentsBtn.addEventListener('click', handleLoadGradeStudents);
-saveGradesBtn.
-
+        if (!isNaN(score) && scoreInput
