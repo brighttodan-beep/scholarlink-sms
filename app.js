@@ -22,20 +22,20 @@ const db = firebase.firestore();
 const auth = firebase.auth();
 
 // FIREBASE COLLECTION NAMES
+const STUDENTS_COLLECTION = "students"; // NEW COLLECTION
 const ATTENDANCE_COLLECTION = "attendanceRecords";
 const GRADING_ITEM_COLLECTION = "gradingItems";
 const GRADES_COLLECTION = "grades";
 
 
-// --- CONFIGURABLE SYSTEM VARIABLES (NEW) ---
+// --- CONFIGURABLE SYSTEM VARIABLES ---
+// Updated Class List per user request
 const SCHOOL_CLASSES = [
-    "KG 1", "P 1", "P 2", "P 3", "P 4", "P 5", "P 6", 
-    "JHS 1", "JHS 2", "JHS 3"
+    "K1", "K2", "P1", "P2", "P3", "P4", "P5", "P6", 
+    "JHS1", "JHS2", "JHS3", "SHS1", "SHS2", "SHS3"
 ];
 
-const DUMMY_STUDENTS = [
-    "Kwame Nkrumah", "Yaa Asantewaa", "John Kufuor", "Ama Ghana", "Kofi Annan"
-];
+// DUMMY_STUDENTS array REMOVED to enforce manual entry
 
 // --- 1. DOM Element References ---
 const authStatusEl = document.getElementById('auth-status');
@@ -87,6 +87,12 @@ const totalAttendanceDaysEl = document.getElementById('totalAttendanceDays');
 const avgAttendanceRateEl = document.getElementById('avgAttendanceRate');
 const recentGradesBodyEl = document.getElementById('recentGradesBody');
 
+// Student Management (for Headmaster Dashboard) (NEW)
+const newStudentNameEl = document.getElementById('newStudentName');
+const newStudentClassEl = document.getElementById('newStudentClass');
+const addStudentBtn = document.getElementById('addStudentBtn');
+const studentListBodyEl = document.getElementById('studentListBody');
+
 
 // --- 2. CORE UTILITY FUNCTIONS ---
 
@@ -103,7 +109,7 @@ function updateStatus(message, type = 'info') {
 
 function populateClassDropdowns() {
     // Collect all class dropdown elements
-    const classSelects = [attClassEl, gradeClassEl, lookupClassEl];
+    const classSelects = [attClassEl, gradeClassEl, lookupClassEl, newStudentClassEl];
     
     classSelects.forEach(selectEl => {
         selectEl.innerHTML = ''; // Clear existing options
@@ -132,6 +138,8 @@ function switchModule(moduleId) {
         loadGradingItems();
     } else if (moduleId === 'headmaster-dashboard') {
         loadDashboardSummary(); 
+        // Load student list when dashboard is active (for management)
+        loadStudentsByClass();
     }
     
     updateStatus(`Module ready: ${moduleId}.`);
@@ -200,10 +208,10 @@ function renderAttendanceTable(students) {
     attendanceTableBody.innerHTML = ''; 
     students.forEach((student) => {
         const row = attendanceTableBody.insertRow();
-        row.insertCell(0).textContent = student;
+        row.insertCell(0).textContent = student.name;
         const statusCell = row.insertCell(1);
         statusCell.innerHTML = `
-            <select class="status-select" data-student="${student}">
+            <select class="status-select" data-student="${student.name}">
                 <option value="Present">Present</option>
                 <option value="Absent">Absent</option>
                 <option value="Late">Late</option>
@@ -214,7 +222,7 @@ function renderAttendanceTable(students) {
 }
 
 
-function handleLoadStudents() {
+async function handleLoadStudents() {
     if (!auth.currentUser) {
         updateStatus("Error: Please log in to load data.", 'error');
         return;
@@ -228,8 +236,28 @@ function handleLoadStudents() {
     }
 
     updateStatus(`Loading students for ${selectedClass} on ${selectedDate}...`);
-    renderAttendanceTable(DUMMY_STUDENTS);
-    updateStatus(`5 students loaded for ${selectedClass}. Mark attendance.`);
+    
+    try {
+        const snapshot = await db.collection(STUDENTS_COLLECTION)
+            .where('class', '==', selectedClass)
+            .orderBy('name', 'asc')
+            .get();
+            
+        const students = snapshot.docs.map(doc => doc.data());
+        
+        if (students.length === 0) {
+            updateStatus(`No students found for ${selectedClass}. Please add students via the Dashboard.`, 'error');
+            attendanceTableBody.innerHTML = '<tr><td colspan="2">No students found.</td></tr>';
+            saveAttendanceBtn.disabled = true;
+            return;
+        }
+
+        renderAttendanceTable(students);
+        updateStatus(`${students.length} students loaded for ${selectedClass}. Mark attendance.`);
+
+    } catch (error) {
+        updateStatus(`Error loading students: ${error.message}`, 'error');
+    }
 }
 
 async function handleSaveAttendance() {
@@ -274,7 +302,7 @@ async function handleSaveAttendance() {
 }
 
 
-// --- 5. GRADEBOOK LOGIC ---
+// --- 5. GRADEBOOK LOGIC (UNCHANGED) ---
 
 async function handleAddGradeItem() {
     if (!auth.currentUser) {
@@ -342,7 +370,7 @@ async function loadGradingItems() {
     }
 }
 
-function handleLoadGradeStudents() {
+async function handleLoadGradeStudents() {
      if (!auth.currentUser) {
         updateStatus("Error: Please log in to load data.", 'error');
         return;
@@ -359,18 +387,38 @@ function handleLoadGradeStudents() {
     const selectedClass = gradeClassEl.value;
 
     gradesTableBody.innerHTML = '';
-    DUMMY_STUDENTS.forEach((student) => {
-        const row = gradesTableBody.insertRow();
-        row.insertCell(0).textContent = student;
-        
-        const inputCell = row.insertCell(1);
-        inputCell.innerHTML = `
-            <input type="number" class="score-input" data-student="${student}" min="0" max="${totalMarks}" placeholder="Score / ${totalMarks}">
-        `;
-    });
     
-    saveGradesBtn.disabled = DUMMY_STUDENTS.length === 0;
-    updateStatus(`Students loaded for ${selectedItem.textContent} (${selectedClass}). Enter scores.`);
+    try {
+        const snapshot = await db.collection(STUDENTS_COLLECTION)
+            .where('class', '==', selectedClass)
+            .orderBy('name', 'asc')
+            .get();
+            
+        const students = snapshot.docs.map(doc => doc.data());
+        
+        if (students.length === 0) {
+            updateStatus(`No students found for ${selectedClass}.`, 'error');
+            gradesTableBody.innerHTML = '<tr><td colspan="2">No students found.</td></tr>';
+            saveGradesBtn.disabled = true;
+            return;
+        }
+        
+        students.forEach((student) => {
+            const row = gradesTableBody.insertRow();
+            row.insertCell(0).textContent = student.name;
+            
+            const inputCell = row.insertCell(1);
+            inputCell.innerHTML = `
+                <input type="number" class="score-input" data-student="${student.name}" min="0" max="${totalMarks}" placeholder="Score / ${totalMarks}">
+            `;
+        });
+
+        saveGradesBtn.disabled = students.length === 0;
+        updateStatus(`Students loaded for ${selectedItem.textContent} (${selectedClass}). Enter scores.`);
+        
+    } catch (error) {
+        updateStatus(`Error loading students for grading: ${error.message}`, 'error');
+    }
 }
 
 
@@ -435,7 +483,7 @@ async function handleSaveGrades() {
 }
 
 
-// --- 6. PARENT PORTAL LOGIC ---
+// --- 6. PARENT PORTAL LOGIC (UNCHANGED) ---
 
 async function handleLookupRecords() {
     if (!auth.currentUser) {
@@ -525,7 +573,62 @@ async function handleLookupRecords() {
 }
 
 
-// --- 7. HEADMASTER DASHBOARD LOGIC ---
+// --- 7. HEADMASTER DASHBOARD LOGIC (Includes Student Management) ---
+
+// ** NEW FUNCTIONALITY **
+async function handleAddStudent() {
+    if (!auth.currentUser) return updateStatus("Security Error: Must be logged in.", 'error');
+    
+    const name = newStudentNameEl.value.trim();
+    const classValue = newStudentClassEl.value;
+
+    if (name === '' || classValue === '') {
+        return updateStatus("Error: Student Name and Class are required.", 'error');
+    }
+    
+    updateStatus(`Adding student ${name} to ${classValue}...`, 'info');
+    
+    try {
+        await db.collection(STUDENTS_COLLECTION).add({
+            name: name,
+            class: classValue,
+            addedBy: auth.currentUser.email,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        updateStatus(`SUCCESS! Student ${name} added to ${classValue}.`, 'success');
+        newStudentNameEl.value = ''; // Clear input
+        loadStudentsByClass(classValue); // Refresh list
+    } catch (error) {
+        updateStatus(`ERROR adding student: ${error.message}`, 'error');
+    }
+}
+
+async function loadStudentsByClass(selectedClass = newStudentClassEl.value) {
+    if (!auth.currentUser) return;
+    
+    try {
+        const snapshot = await db.collection(STUDENTS_COLLECTION)
+            .where('class', '==', selectedClass)
+            .orderBy('name', 'asc')
+            .get();
+        
+        studentListBodyEl.innerHTML = '';
+        if (snapshot.empty) {
+            studentListBodyEl.innerHTML = `<tr><td colspan="2">No students registered in ${selectedClass}.</td></tr>`;
+        } else {
+            snapshot.forEach(doc => {
+                const student = doc.data();
+                const row = studentListBodyEl.insertRow();
+                row.insertCell(0).textContent = student.name;
+                row.insertCell(1).textContent = student.class;
+            });
+        }
+    } catch (error) {
+        console.error("Student List Load Error:", error);
+    }
+}
+
 
 async function loadDashboardSummary() {
     if (!auth.currentUser) return;
@@ -534,7 +637,6 @@ async function loadDashboardSummary() {
     try {
         // A. Teachers Count (Placeholder/Estimate from Auth)
         totalTeachersEl.textContent = '2+ (Based on current log-ins)';
-
 
         // B. Total Attendance Summary
         const attendanceSnapshot = await db.collection(ATTENDANCE_COLLECTION).get();
@@ -606,6 +708,10 @@ saveGradesBtn.addEventListener('click', handleSaveGrades);
 
 // Parent Portal Module
 lookupBtn.addEventListener('click', handleLookupRecords);
+
+// Headmaster Dashboard Management (NEW)
+addStudentBtn.addEventListener('click', handleAddStudent);
+newStudentClassEl.addEventListener('change', loadStudentsByClass);
 
 // Call setup functions (Populates all class dropdowns on load)
 populateClassDropdowns();
