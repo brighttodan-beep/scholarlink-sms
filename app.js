@@ -23,8 +23,8 @@ const auth = firebase.auth();
 
 // FIREBASE COLLECTION NAMES
 const ATTENDANCE_COLLECTION = "attendanceRecords";
-const GRADING_ITEM_COLLECTION = "gradingItems"; // NEW COLLECTION
-const GRADES_COLLECTION = "grades"; // NEW COLLECTION
+const GRADING_ITEM_COLLECTION = "gradingItems";
+const GRADES_COLLECTION = "grades";
 
 
 // --- 1. DOM Element References ---
@@ -49,9 +49,9 @@ const attClassEl = document.getElementById('attClass');
 const attDateEl = document.getElementById('attDate');
 const loadStudentsBtn = document.getElementById('loadStudentsBtn');
 const saveAttendanceBtn = document.getElementById('saveAttendanceBtn');
-const attendanceTableBody = document.getElementById('attendanceTableBody'); // Renamed for clarity
+const attendanceTableBody = document.getElementById('attendanceTableBody');
 
-// Gradebook Module References (NEW)
+// Gradebook Module References
 const gradeSubjectEl = document.getElementById('gradeSubject');
 const gradeItemNameEl = document.getElementById('gradeItemName');
 const totalMarksEl = document.getElementById('totalMarks');
@@ -205,7 +205,8 @@ async function handleSaveAttendance() {
     const selectedDate = attDateEl.value;
     const records = [];
     
-    tableBody.querySelectorAll('tr').forEach(row => {
+    // Logic to gather records
+    document.querySelectorAll('#attendanceTableBody tr').forEach(row => { // Use the correct ID reference
         const name = row.cells[0].textContent;
         const status = row.cells[1].querySelector('.status-select').value;
         records.push({ name, status });
@@ -237,7 +238,7 @@ async function handleSaveAttendance() {
 }
 
 
-// --- 5. GRADEBOOK LOGIC (NEW) ---
+// --- 5. GRADEBOOK LOGIC (CORRECTED) ---
 
 async function handleAddGradeItem() {
     if (!auth.currentUser) {
@@ -265,10 +266,12 @@ async function handleAddGradeItem() {
     updateStatus(`Adding new grading item: ${itemName}...`, 'info');
     
     try {
-        await db.collection(GRADING_ITEM_COLLECTION).add(itemData);
+        // Use set with a specific ID to ensure no duplicates for the current user/item combo
+        const docId = `${auth.currentUser.uid}_${subject}_${itemName.replace(/\s/g, '_')}`;
+        await db.collection(GRADING_ITEM_COLLECTION).doc(docId).set(itemData);
+        
         updateStatus(`SUCCESS! Grading item '${itemName}' added.`, 'success');
         
-        // Clear form and reload dropdown
         gradeItemNameEl.value = '';
         totalMarksEl.value = '';
         loadGradingItems(); 
@@ -280,19 +283,22 @@ async function handleAddGradeItem() {
 
 
 async function loadGradingItems() {
-    if (!auth.currentUser) return; // Must be logged in
+    if (!auth.currentUser) return;
     
     try {
-        const snapshot = await db.collection(GRADING_ITEM_COLLECTION).get();
+        // Fetch only items created by the current user for organization
+        const snapshot = await db.collection(GRADING_ITEM_COLLECTION)
+                                 .where('createdBy', '==', auth.currentUser.email)
+                                 .get();
         
         gradingItemSelectEl.innerHTML = '<option value="">-- Select Test/Assignment --</option>';
         
         snapshot.forEach(doc => {
             const item = doc.data();
             const option = document.createElement('option');
-            option.value = doc.id; // Store the unique ID of the item
+            option.value = doc.id;
             option.textContent = `${item.subject}: ${item.name} (Max: ${item.totalMarks})`;
-            option.dataset.max = item.totalMarks; // Store max score on the option
+            option.dataset.max = item.totalMarks;
             gradingItemSelectEl.appendChild(option);
         });
         
@@ -309,16 +315,16 @@ function handleLoadGradeStudents() {
     }
     
     const selectedItem = gradingItemSelectEl.options[gradingItemSelectEl.selectedIndex];
-    const selectedClass = gradeClassEl.value;
-
-    if (!selectedItem.value) {
+    
+    // FIX: Check if an item is truly selected by checking the 'value'
+    if (!selectedItem || !selectedItem.value) {
         updateStatus("Error: Please create or select a grading item first.", 'error');
         return;
     }
     
     const totalMarks = selectedItem.dataset.max;
-    
-    // Render the student table for grading
+    const selectedClass = gradeClassEl.value;
+
     gradesTableBody.innerHTML = '';
     DUMMY_STUDENTS.forEach((student) => {
         const row = gradesTableBody.insertRow();
@@ -342,18 +348,25 @@ async function handleSaveGrades() {
     }
 
     const selectedItem = gradingItemSelectEl.options[gradingItemSelectEl.selectedIndex];
+    
+    if (!selectedItem || !selectedItem.value) {
+         updateStatus("Error: No valid grading item selected.", 'error');
+         return;
+    }
+    
+    const selectedItemId = selectedItem.value;
     const selectedClass = gradeClassEl.value;
     const totalMarks = selectedItem.dataset.max;
 
     const gradeRecords = [];
     
     // Gather grades from the table
-    gradesTableBody.querySelectorAll('tr').forEach(row => {
+    document.querySelectorAll('#gradesTableBody tr').forEach(row => {
         const studentName = row.cells[0].textContent;
         const scoreInput = row.cells[1].querySelector('.score-input');
         const score = parseInt(scoreInput.value);
 
-        if (!isNaN(score) && scoreInput.value.trim() !== '') {
+        if (!isNaN(score) && scoreInput.value.trim() !== '' && score >= 0 && score <= totalMarks) {
              gradeRecords.push({ 
                 student: studentName, 
                 score: score, 
@@ -371,10 +384,10 @@ async function handleSaveGrades() {
 
     try {
         // Create a single document for this class's grades for this specific item
-        const docId = `${selectedItem.value}_${selectedClass}`; 
+        const docId = `${selectedItemId}_${selectedClass}`; 
         
         await db.collection(GRADES_COLLECTION).doc(docId).set({
-            gradingItemId: selectedItem.value,
+            gradingItemId: selectedItemId,
             gradingItemName: selectedItem.textContent,
             class: selectedClass,
             totalMarks: totalMarks,
@@ -410,4 +423,4 @@ saveAttendanceBtn.addEventListener('click', handleSaveAttendance);
 // Gradebook Module (NEW)
 addGradeItemBtn.addEventListener('click', handleAddGradeItem);
 loadGradeStudentsBtn.addEventListener('click', handleLoadGradeStudents);
-saveGradesBtn.addEventListener('click', handleSaveGrades);
+saveGradesBtn.
