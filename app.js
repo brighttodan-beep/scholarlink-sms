@@ -427,4 +427,96 @@ async function handleLookupRecords() {
     studentNameDisplayEl.textContent = lookupName;
     attendanceSummaryEl.innerHTML = '';
     gradesSummaryBodyEl.innerHTML = '';
-    updateStatus(`Searching for records for ${lookupName} in ${lookup
+    updateStatus(`Searching for records for ${lookupName} in ${lookupClass}...`, 'info');
+
+    // --- A. Fetch Attendance Records ---
+    try {
+        const attendanceSnapshot = await db.collection(ATTENDANCE_COLLECTION)
+            .where('class', '==', lookupClass)
+            .get();
+
+        let totalAttendanceDays = 0;
+        let presentCount = 0;
+        let absentCount = 0;
+
+        attendanceSnapshot.forEach(doc => {
+            const record = doc.data().records.find(r => r.name === lookupName);
+            if (record) {
+                totalAttendanceDays++;
+                if (record.status === 'Present') {
+                    presentCount++;
+                } else if (record.status === 'Absent') {
+                    absentCount++;
+                }
+            }
+        });
+
+        const presentPct = totalAttendanceDays > 0 ? ((presentCount / totalAttendanceDays) * 100).toFixed(1) : '0';
+        
+        attendanceSummaryEl.innerHTML = `
+            <li>Total Days Marked: <strong>${totalAttendanceDays}</strong></li>
+            <li>Present: <strong>${presentCount}</strong> (${presentPct}%)</li>
+            <li>Absent: <strong>${absentCount}</strong></li>
+            <li style="color: grey;">(Attendance data is aggregated across all recorded days in the class.)</li>
+        `;
+        
+    } catch (error) {
+        updateStatus(`Error retrieving attendance: ${error.message}`, 'error');
+    }
+
+
+    // --- B. Fetch Grades Records ---
+    try {
+        const gradesSnapshot = await db.collection(GRADES_COLLECTION)
+            .where('class', '==', lookupClass)
+            .get();
+
+        if (gradesSnapshot.empty) {
+            gradesSummaryBodyEl.innerHTML = `<tr><td colspan="3">No grades found for this class.</td></tr>`;
+        }
+
+        gradesSnapshot.forEach(doc => {
+            const gradeRecord = doc.data().grades.find(g => g.student === lookupName);
+            if (gradeRecord) {
+                const row = gradesSummaryBodyEl.insertRow();
+                row.insertCell(0).textContent = doc.data().gradingItemName.split(':')[1].trim();
+                row.insertCell(1).textContent = gradeRecord.score;
+                row.insertCell(2).textContent = gradeRecord.max;
+            }
+        });
+
+        if (gradesSummaryBodyEl.children.length === 0) {
+             gradesSummaryBodyEl.innerHTML = `<tr><td colspan="3">Student not found in any saved grade entries.</td></tr>`;
+        }
+        
+    } catch (error) {
+         updateStatus(`Error retrieving grades: ${error.message}`, 'error');
+    }
+    
+    updateStatus(`Records successfully loaded for ${lookupName}.`, 'success');
+}
+
+
+// --- 7. EVENT LISTENERS & INITIAL SETUP ---
+
+// Authentication Buttons
+registerBtn.addEventListener('click', handleRegister);
+loginBtn.addEventListener('click', handleLogin);
+logoutBtn.addEventListener('click', handleLogout);
+
+// Module Tabs
+tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => switchModule(btn.getAttribute('data-module')));
+});
+
+// Attendance Module
+loadStudentsBtn.addEventListener('click', handleLoadStudents);
+saveAttendanceBtn.addEventListener('click', handleSaveAttendance);
+
+// Gradebook Module
+addGradeItemBtn.addEventListener('click', handleAddGradeItem);
+loadGradeStudentsBtn.addEventListener('click', handleLoadGradeStudents);
+saveGradesBtn.addEventListener('click', handleSaveGrades);
+
+// Parent Portal Module
+lookupBtn.addEventListener('click', handleLookupRecords);
