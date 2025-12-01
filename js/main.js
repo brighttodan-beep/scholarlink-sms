@@ -161,11 +161,45 @@ function switchModule(moduleId) {
         loadGradingItems();
     } else if (moduleId === 'headmaster-dashboard') {
         loadDashboardSummary(); 
-        // CORRECTED: Ensure we load the student list whenever the dashboard is shown
         if(newStudentClassEl) loadStudentsByClass(newStudentClassEl.value); 
     }
     
     updateStatus(`Module ready: ${moduleId}.`);
+}
+
+/**
+ * Attaches all core application event listeners only once after initialization.
+ * This function is separated for clarity and robustness.
+ */
+function attachGlobalListeners() {
+    // Module Tabs (Only attach listeners for visible tabs)
+    tabBtns.forEach(btn => {
+        if (!btn.classList.contains('hidden')) {
+            btn.addEventListener('click', () => switchModule(btn.getAttribute('data-module')));
+        }
+    });
+
+    // Logout Button
+    if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+
+    // Module specific listeners
+    if (loadStudentsBtn) loadStudentsBtn.addEventListener('click', handleLoadStudents);
+    if (saveAttendanceBtn) saveAttendanceBtn.addEventListener('click', handleSaveAttendance);
+    if (addGradeItemBtn) addGradeItemBtn.addEventListener('click', handleAddGradeItem);
+    if (loadGradeStudentsBtn) loadGradeStudentsBtn.addEventListener('click', handleLoadGradeStudents);
+    if (saveGradesBtn) saveGradesBtn.addEventListener('click', handleSaveGrades);
+    if (lookupBtn) lookupBtn.addEventListener('click', handleLookupRecords);
+
+    // CRITICAL FIX: Ensure the Add Student button is targeted correctly
+    if (addStudentBtn) {
+        addStudentBtn.addEventListener('click', handleAddStudent);
+        console.log("SUCCESS: Add Student button listener attached.");
+    } else {
+        console.error("ERROR: Add Student button element (ID: addStudentBtn) not found in DOM.");
+    }
+
+    // Class change listener for Admin Dashboard Student List
+    if (newStudentClassEl) newStudentClassEl.addEventListener('change', () => loadStudentsByClass(newStudentClassEl.value));
 }
 
 // --- 3. AUTHENTICATION LOGIC (Updated for Multi-Tenancy & RBAC) ---
@@ -192,44 +226,23 @@ async function initializeApplicationLogic(user) {
         if (userNameEl) userNameEl.textContent = `${user.email} (${userRole} | ${userSchoolId})`;
         updateStatus(`Welcome back, ${user.email}! Role: ${userRole}. School: ${userSchoolId}`, 'success');
         
-        // --- NEW: RBAC SETUP ---
+        // --- RBAC SETUP ---
         applyRoleBasedAccess(userRole);
         // --- END RBAC SETUP ---
 
-        // 4. Set up all App Event Listeners
+        // 4. Set up all App Event Listeners (Reworked to a function)
         populateClassDropdowns();
-
-        // Module Tabs (Only attach listeners for visible tabs)
-        tabBtns.forEach(btn => {
-            if (!btn.classList.contains('hidden')) {
-                btn.addEventListener('click', () => switchModule(btn.getAttribute('data-module')));
-            }
-        });
-
-        // Logout Button
-        if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
-
-        // Module specific listeners (These run regardless of role, but the UI is hidden)
-        if (loadStudentsBtn) loadStudentsBtn.addEventListener('click', handleLoadStudents);
-        if (saveAttendanceBtn) saveAttendanceBtn.addEventListener('click', handleSaveAttendance);
-        if (addGradeItemBtn) addGradeItemBtn.addEventListener('click', handleAddGradeItem);
-        if (loadGradeStudentsBtn) loadGradeStudentsBtn.addEventListener('click', handleLoadGradeStudents);
-        if (saveGradesBtn) saveGradesBtn.addEventListener('click', handleSaveGrades);
-        if (lookupBtn) lookupBtn.addEventListener('click', handleLookupRecords);
-        if (addStudentBtn) addStudentBtn.addEventListener('click', handleAddStudent);
+        attachGlobalListeners();
         
-        // **CORRECTION HERE:** Attach the load function to the change event.
-        if (newStudentClassEl) newStudentClassEl.addEventListener('change', () => loadStudentsByClass(newStudentClassEl.value));
-        
-        // Start on the first active module based on the role
+
+        // 5. Start on the first active module based on the role
         const firstActiveModuleButton = document.querySelector('.tab-btn:not(.hidden)');
         if (firstActiveModuleButton) {
             const firstModuleId = firstActiveModuleButton.getAttribute('data-module');
             switchModule(firstModuleId);
             
-            // **CRITICAL FIX:** If the starting module is the dashboard, ensure the student list loads immediately.
+            // CRITICAL: Force initial student list load if starting on the dashboard
             if (firstModuleId === 'headmaster-dashboard' && newStudentClassEl) {
-                // Ensure the value is set before attempting to load
                 loadStudentsByClass(newStudentClassEl.value); 
             }
         }
@@ -599,203 +612,3 @@ async function handleLookupRecords() {
             .where('schoolId', '==', userSchoolId) 
             .where('class', '==', lookupClass)
             .get();
-
-        let totalAttendanceDays = 0;
-        let presentCount = 0;
-        let absentCount = 0;
-
-        attendanceSnapshot.forEach(doc => {
-            const record = doc.data().records.find(r => r.name === lookupName);
-            if (record) {
-                totalAttendanceDays++;
-                if (record.status === 'Present') {
-                    presentCount++;
-                } else if (record.status === 'Absent') {
-                    absentCount++;
-                }
-            }
-        });
-
-        const presentPct = totalAttendanceDays > 0 ? ((presentCount / totalAttendanceDays) * 100).toFixed(1) : '0';
-        
-        attendanceSummaryEl.innerHTML = `
-            <li>Total Days Marked: <strong>${totalAttendanceDays}</strong></li>
-            <li>Present: <strong>${presentCount}</strong> (${presentPct}%)</li>
-            <li>Absent: <strong>${absentCount}</strong></li>
-            <li style="color: grey;">(Attendance data is aggregated across all recorded days in the class.)</li>
-        `;
-        
-    } catch (error) {
-        updateStatus(`Error retrieving attendance: ${error.message}`, 'error');
-    }
-
-
-    // --- B. Fetch Grades Records ---
-    try {
-        const gradesSnapshot = await db.collection(GRADES_COLLECTION)
-            // FILTER BY SCHOOL ID
-            .where('schoolId', '==', userSchoolId) 
-            .where('class', '==', lookupClass)
-            .get();
-
-        if (gradesSnapshot.empty) {
-            gradesSummaryBodyEl.innerHTML = `<tr><td colspan="3">No grades found for this class.</td></tr>`;
-        }
-
-        gradesSnapshot.forEach(doc => {
-            const gradeRecord = doc.data().grades.find(g => g.student === lookupName);
-            if (gradeRecord) {
-                const row = gradesSummaryBodyEl.insertRow();
-                row.insertCell(0).textContent = doc.data().gradingItemName.split(':')[1].trim();
-                row.insertCell(1).textContent = gradeRecord.score;
-                row.insertCell(2).textContent = gradeRecord.max;
-            }
-        });
-
-        if (gradesSummaryBodyEl.children.length === 0) {
-             gradesSummaryBodyEl.innerHTML = `<tr><td colspan="3">Student not found in any saved grade entries.</td></tr>`;
-        }
-        
-    } catch (error) {
-         updateStatus(`Error retrieving grades: ${error.message}`, 'error');
-    }
-    
-    updateStatus(`Records successfully loaded for ${lookupName}.`, 'success');
-}
-
-
-// --- 7. HEADMASTER DASHBOARD LOGIC (UPDATED WITH schoolId FILTER/SAVE) ---
-
-async function handleAddStudent() {
-    if (!auth.currentUser || !newStudentNameEl || !newStudentClassEl || !userSchoolId) return;
-    
-    const name = newStudentNameEl.value.trim();
-    const classValue = newStudentClassEl.value;
-
-    if (name === '' || classValue === '') {
-        return updateStatus("Error: Student Name and Class are required.", 'error');
-    }
-    
-    updateStatus(`Adding student ${name} to ${classValue}...`, 'info');
-    
-    try {
-        await db.collection(STUDENTS_COLLECTION).add({
-            name: name,
-            class: classValue,
-            // SAVE SCHOOL ID
-            schoolId: userSchoolId, 
-            addedBy: auth.currentUser.email,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-
-        updateStatus(`SUCCESS! Student ${name} added to ${classValue}.`, 'success');
-        newStudentNameEl.value = ''; // Clear input
-        loadStudentsByClass(classValue); // Refresh list
-    } catch (error) {
-        updateStatus(`ERROR adding student: ${error.message}`, 'error');
-    }
-}
-
-async function loadStudentsByClass(selectedClass) {
-    // FIX: Ensure selectedClass is a string, if no value is passed (e.g., initial load) use the current dropdown value
-    if (!selectedClass) {
-        if (newStudentClassEl && newStudentClassEl.value) {
-            selectedClass = newStudentClassEl.value;
-        } else {
-            console.warn("loadStudentsByClass called without a valid class value.");
-            return;
-        }
-    }
-
-    if (!auth.currentUser || !studentListBodyEl || !userSchoolId) return;
-    
-    try {
-        const snapshot = await db.collection(STUDENTS_COLLECTION)
-            // FILTER BY SCHOOL ID
-            .where('schoolId', '==', userSchoolId) 
-            .where('class', '==', selectedClass)
-            .orderBy('name', 'asc')
-            .get();
-        
-        studentListBodyEl.innerHTML = '';
-        if (snapshot.empty) {
-            studentListBodyEl.innerHTML = `<tr><td colspan="2">No students registered in ${selectedClass}.</td></tr>`;
-        } else {
-            snapshot.forEach(doc => {
-                const student = doc.data();
-                const row = studentListBodyEl.insertRow();
-                row.insertCell(0).textContent = student.name;
-                row.insertCell(1).textContent = student.class;
-            });
-        }
-    } catch (error) {
-        console.error("Student List Load Error:", error);
-    }
-}
-
-
-async function loadDashboardSummary() {
-    if (!auth.currentUser || !totalTeachersEl || !totalAttendanceDaysEl || !avgAttendanceRateEl || !recentGradesBodyEl || !userSchoolId) return;
-    updateStatus('Loading School Dashboard Summary...', 'info');
-
-    try {
-        // A. Teachers Count (Placeholder/Estimate from Auth)
-        totalTeachersEl.textContent = '2+ (Based on current log-ins)';
-
-        // B. Total Attendance Summary
-        const attendanceSnapshot = await db.collection(ATTENDANCE_COLLECTION)
-            // FILTER BY SCHOOL ID
-            .where('schoolId', '==', userSchoolId) 
-            .get();
-            
-        let totalDays = attendanceSnapshot.docs.length;
-        let totalStudentsMarked = 0;
-        let totalPresent = 0;
-        
-        attendanceSnapshot.forEach(doc => {
-            const records = doc.data().records;
-            totalStudentsMarked += records.length;
-            totalPresent += records.filter(r => r.status === 'Present').length;
-        });
-
-        const avgRate = totalStudentsMarked > 0 ? ((totalPresent / totalStudentsMarked) * 100).toFixed(1) : '0.0';
-
-        totalAttendanceDaysEl.textContent = totalDays;
-        avgAttendanceRateEl.textContent = `${avgRate}%`;
-
-
-        // C. Recent Grades (Last 5 Entries)
-        const gradesSnapshot = await db.collection(GRADES_COLLECTION)
-            // FILTER BY SCHOOL ID
-            .where('schoolId', '==', userSchoolId) 
-            .orderBy('savedAt', 'desc')
-            .limit(5)
-            .get();
-
-        recentGradesBodyEl.innerHTML = '';
-        if (gradesSnapshot.empty) {
-            recentGradesBodyEl.innerHTML = '<tr><td colspan="4">No grades saved yet.</td></tr>';
-        } else {
-            gradesSnapshot.forEach(doc => {
-                const data = doc.data();
-                const row = recentGradesBodyEl.insertRow();
-                row.insertCell(0).textContent = data.gradingItemName.split(':')[1].trim();
-                row.insertCell(1).textContent = data.class;
-                row.insertCell(2).textContent = data.grades.length;
-                row.insertCell(3).textContent = data.savedBy.split('@')[0];
-            });
-        }
-        
-        updateStatus('Dashboard loaded successfully!', 'success');
-
-    } catch (error) {
-        console.error("Dashboard Load Error:", error);
-        updateStatus(`ERROR loading dashboard: ${error.message}`, 'error');
-    }
-}
-
-
-// --- 8. EVENT LISTENERS & INITIAL SETUP (Login Page Only) ---
-
-// Attach event listeners for the login page elements immediately
-if (loginBtn) loginBtn.addEventListener('click', handleLogin);
