@@ -144,27 +144,24 @@ function handleAuthStateChange() {
     }
 }
 
-document.getElementById('loginBtn').addEventListener('click', () => {
-    const email = document.getElementById('loginEmail').value.trim(); // Added .trim()
+document.getElementById('loginBtn').addEventListener('click', async () => {
+    const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
     const authStatus = document.getElementById('auth-status');
     
-    authStatus.textContent = 'Verifying credentials...';
+    authStatus.textContent = 'Logging in via Firebase...';
 
-    const userEntry = LOCAL_USERS[email];
-    
-    if (userEntry && userEntry.password === password) {
-        // SUCCESS: Define currentUser and switch view
-        currentUser = { email: email, role: userEntry.role, uid: email.replace('@', '_') };
+    try {
+        // Attempt to sign in using the new client email/password
+        await auth.signInWithEmailAndPassword(email, password);
+        
+        // If successful, the auth.onAuthStateChanged listener will handle the UI update
         authStatus.textContent = 'Login successful!';
         
-        // Use a slight delay to ensure the success message is seen
-        setTimeout(handleAuthStateChange, 400); 
-        
-    } else {
-        // FAILURE: Clear credentials and show error
-        currentUser = null;
-        authStatus.textContent = `Error: Invalid email or password. Please try again.`;
+    } catch (error) {
+        console.error("Login error:", error.message);
+        // This is where you will see the API Key error or an "invalid credentials" error
+        authStatus.textContent = `Error: ${error.message}`;
     }
 });
 
@@ -249,5 +246,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initLocalData();
     handleAuthStateChange(); // Check initial state (will default to logged out)
 });
+
 
 
