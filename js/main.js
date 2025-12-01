@@ -1,57 +1,80 @@
 // =================================================================
-// 1. FIREBASE CONFIGURATION & INITIALIZATION
+// 1. LOCAL DATA SETUP & UTILITIES
 // =================================================================
 
-// !!! IMPORTANT !!!
-// REPLACE with your Firebase project credentials. You get these from your
-// Firebase Project Settings -> General -> Your Apps.
-const firebaseConfig = {
-  apiKey: "AIzaSyDt1nGhKNXz6bLfLILUfJ_RnfD45_VgVX0",
-  authDomain: "scholarlink-sms-app.firebaseapp.com",
-  projectId: "scholarlink-sms-app",
-  storageBucket: "scholarlink-sms-app.firebasestorage.app",
-  messagingSenderId: "866758277016",
-  appId: "1:866758277016:web:c848393d8a0cce4ea5dded",
-  measurementId: "G-NLKTVVVQGZ"
+// Define the structure for local data storage
+const LOCAL_STORAGE_KEY = 'ScholarLinkData';
+let localData = {
+    users: {}, // Simulates user roles, etc.
+    students: [
+        { id: 'S001', name: 'Alice Smith', class: 'Grade 1A' },
+        { id: 'S002', name: 'Bob Johnson', class: 'Grade 2B' }
+    ],
+    classes: ['Grade 1A', 'Grade 2B', 'Grade 3C'],
+    grades: []
 };
 
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.firestore();
-
-// =================================================================
-// 2. GLOBAL ROLE PERMISSIONS & UI HELPERS
-// =================================================================
+// Map of user credentials for local testing
+const LOCAL_USERS = {
+    'admin@school.com': { password: 'password', role: 'admin' },
+    'teacher@school.com': { password: 'password', role: 'teacher' }
+};
 
 // Map of roles to the section IDs (data-module attributes) they can access
 const ROLE_PERMISSIONS = {
-    'admin': [
-        'attendance', 
-        'grade', 
-        'student-management', 
-        'parent-portal', 
-        'headmaster-dashboard'
-    ],
-    'teacher': [
-        'attendance', 
-        'grade', 
-        'parent-portal'
-    ],
-    // Default fallback role for safety
+    'admin': ['attendance', 'grade', 'student-management', 'parent-portal', 'headmaster-dashboard'],
+    'teacher': ['attendance', 'grade', 'parent-portal'],
     'guest': [] 
 };
 
 /**
- * Hides unauthorized tabs and sections based on the user's role.
- * @param {string} userRole - The role of the logged-in user (e.g., 'teacher', 'admin').
+ * Initializes local storage with default data if empty.
  */
+function initLocalData() {
+    const storedData = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (storedData) {
+        localData = JSON.parse(storedData);
+    } else {
+        // Save initial data if nothing exists
+        saveLocalData();
+    }
+}
+
+/**
+ * Saves the current localData object back to localStorage.
+ */
+function saveLocalData() {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(localData));
+}
+
+
+// Global variable to track the currently logged-in user
+let currentUser = null; 
+
+
+// =================================================================
+// 2. UI HELPERS (Status, Permissions, Tabs - UNCHANGED)
+// =================================================================
+
+function showStatus(elementId, message, type) {
+    const statusEl = document.getElementById(elementId);
+    if (statusEl) {
+        statusEl.className = 'status-message alert mb-3 hidden';
+        statusEl.classList.add(`alert-${type}`);
+        statusEl.textContent = message;
+        statusEl.classList.remove('hidden');
+        setTimeout(() => {
+            statusEl.classList.add('hidden');
+            statusEl.textContent = '';
+        }, 3000); 
+    }
+}
+
 function applyRolePermissions(userRole) {
     const allowedModules = ROLE_PERMISSIONS[userRole] || ROLE_PERMISSIONS['guest'];
     const allTabButtons = document.querySelectorAll('.tab-btn');
     const allSections = document.querySelectorAll('.module-section');
     
-    // 1. Filter Navigation Tabs: Show only allowed tabs
     allTabButtons.forEach(tabBtn => {
         const moduleName = tabBtn.getAttribute('data-module');
         if (allowedModules.includes(moduleName)) {
@@ -61,62 +84,21 @@ function applyRolePermissions(userRole) {
         }
     });
 
-    // 2. Deactivate all sections initially
     allSections.forEach(section => {
         section.classList.remove('active');
         section.classList.add('hidden');
     });
 
-    // 3. Set a default visible module/tab for the user's role
     if (allowedModules.length > 0) {
-        const defaultModule = allowedModules[0];
-        // Manually trigger the tab switch function for the first allowed tab
-        activateModule(defaultModule); 
+        activateModule(allowedModules[0]); 
     }
 }
 
-
-/**
- * Displays a temporary status message in a designated element.
- * @param {string} elementId - The ID of the div to display the message in.
- * @param {string} message - The message text.
- * @param {string} type - 'success', 'error', or 'info'.
- */
-function showStatus(elementId, message, type) {
-    const statusEl = document.getElementById(elementId);
-    if (statusEl) {
-        // Reset classes and hide
-        statusEl.className = 'status-message alert mb-3 hidden';
-        
-        // Set new type class (alert-success, alert-danger, alert-info)
-        statusEl.classList.add(`alert-${type}`);
-
-        statusEl.textContent = message;
-        statusEl.classList.remove('hidden');
-
-        // Automatically hide the message after 3 seconds
-        setTimeout(() => {
-            statusEl.classList.add('hidden');
-            statusEl.textContent = '';
-        }, 3000); 
-    }
-}
-
-// =================================================================
-// 3. TAB SWITCHING LOGIC
-// =================================================================
-
-/**
- * Handles the logic for switching between application modules/tabs.
- * @param {string} moduleName - The ID of the module section to activate.
- */
 function activateModule(moduleName) {
-    // 1. Deactivate all tabs and content sections
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelectorAll('.module-section').forEach(section => section.classList.remove('active'));
+    document.querySelectorAll('.module-section').forEach(section => section.classList.remove('active', 'hidden'));
     document.querySelectorAll('.module-section').forEach(section => section.classList.add('hidden'));
 
-    // 2. Activate the selected tab and content section
     const activeBtn = document.querySelector(`.tab-btn[data-module="${moduleName}"]`);
     const activeSection = document.getElementById(moduleName);
 
@@ -127,7 +109,6 @@ function activateModule(moduleName) {
     }
 }
 
-// Event listener for sidebar tabs
 document.querySelectorAll('.tab-btn').forEach(button => {
     button.addEventListener('click', (e) => {
         const moduleName = e.target.getAttribute('data-module');
@@ -135,50 +116,34 @@ document.querySelectorAll('.tab-btn').forEach(button => {
     });
 });
 
+
 // =================================================================
-// 4. AUTHENTICATION & ROLE CHECK
+// 3. LOCAL AUTHENTICATION (Simulated Login)
 // =================================================================
 
-// Authentication state listener: runs on page load and on login/logout
-auth.onAuthStateChanged(user => {
+function handleAuthStateChange() {
     const authSection = document.getElementById('auth-section');
     const appSection = document.getElementById('app-section');
 
-    if (user) {
-        // User is logged in. Fetch role and display app.
+    if (currentUser) {
+        // Logged In
         authSection.classList.add('hidden');
+        appSection.classList.remove('hidden');
         
-        // Fetch role from Firestore
-        db.collection('users').doc(user.uid).get()
-            .then(doc => {
-                const userRole = doc.data()?.role || 'teacher'; // Default to 'teacher'
-                
-                document.getElementById('userName').textContent = `${user.email} (${userRole})`;
-                
-                // --- CORE ROLE LOGIC ---
-                applyRolePermissions(userRole); 
-                // --- END CORE ROLE LOGIC ---
-                
-                appSection.classList.remove('hidden');
+        document.getElementById('userName').textContent = `${currentUser.email} (${currentUser.role})`;
+        applyRolePermissions(currentUser.role); 
+        
+        // Load class data into dropdowns (Placeholder for actual data population)
+        loadClassesDropdowns();
 
-            })
-            .catch(error => {
-                console.error("Error fetching user role:", error);
-                // Even if role fetch fails, show the app with minimal permissions
-                applyRolePermissions('guest'); 
-                appSection.classList.remove('hidden');
-            });
-            
     } else {
-        // User is logged out. Show login form.
+        // Logged Out
         appSection.classList.add('hidden');
         authSection.classList.remove('hidden');
         document.getElementById('auth-status').textContent = 'Please log in. (Registration is disabled)';
     }
-});
+}
 
-
-// Login Button Handler
 document.getElementById('loginBtn').addEventListener('click', async () => {
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
@@ -186,81 +151,100 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     
     authStatus.textContent = 'Logging in...';
 
-    try {
-        await auth.signInWithEmailAndPassword(email, password);
-        // auth.onAuthStateChanged will handle the UI update on success
+    const userEntry = LOCAL_USERS[email];
+    
+    if (userEntry && userEntry.password === password) {
+        // Simulated successful login
+        currentUser = { email: email, role: userEntry.role, uid: email.replace('@', '_') };
         authStatus.textContent = 'Login successful!';
+        // Use a timeout to simulate network delay before state change
+        setTimeout(handleAuthStateChange, 500); 
         
-    } catch (error) {
-        console.error("Login error:", error.message);
-        authStatus.textContent = `Error: ${error.message}`;
+    } else {
+        // Simulated failed login
+        currentUser = null;
+        authStatus.textContent = `Error: Invalid email or password.`;
     }
 });
 
-// Logout Button Handler
-document.getElementById('logoutBtn').addEventListener('click', async () => {
-    try {
-        await auth.signOut();
-        // auth.onAuthStateChanged will handle the UI update on sign out
-        
-    } catch (error) {
-        console.error("Logout error:", error);
-    }
+document.getElementById('logoutBtn').addEventListener('click', () => {
+    currentUser = null;
+    handleAuthStateChange();
 });
 
 
 // =================================================================
-// 5. STUDENT REGISTRATION LOGIC (WITH STATUS)
+// 4. STUDENT REGISTRATION LOGIC (LOCAL STORAGE)
 // =================================================================
 
-document.getElementById('addStudentBtn').addEventListener('click', async () => {
+document.getElementById('addStudentBtn').addEventListener('click', () => {
     const studentName = document.getElementById('newStudentName').value.trim();
     const studentClass = document.getElementById('newStudentClass').value;
-    const statusElementId = 'studentRegStatus'; // The ID added to the HTML
+    const statusElementId = 'studentRegStatus'; 
 
     if (!studentName || !studentClass) {
         showStatus(statusElementId, 'Please enter a name and select a class.', 'error');
         return;
     }
 
-    const user = auth.currentUser; 
-    if (!user) {
-        showStatus(statusElementId, 'Authentication error. Please log in again.', 'error');
+    if (!currentUser || currentUser.role !== 'admin') {
+        showStatus(statusElementId, 'Access Denied: Only Admins can register students.', 'error');
         return;
     }
 
-    const studentData = {
+    // --- LOCAL STORAGE ADDITION ---
+    const newStudent = {
+        id: `S${Date.now()}`, // Simple unique ID generation
         name: studentName,
         class: studentClass,
-        registeredBy: user.email || user.uid, 
-        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        registeredBy: currentUser.email,
+        timestamp: new Date().toISOString()
     };
 
-    try {
-        await db.collection('students').add(studentData); 
-        
-        // Success Notification
-        showStatus(statusElementId, `Student "${studentName}" successfully registered!`, 'success');
+    localData.students.push(newStudent);
+    saveLocalData();
+    // ------------------------------
+    
+    showStatus(statusElementId, `Student "${studentName}" successfully registered locally!`, 'success');
 
-        // Clear input fields
-        document.getElementById('newStudentName').value = '';
-        // Note: You may want to reload or update the list view here too
-        
-    } catch (error) {
-        console.error("Error adding student:", error);
-        // Error Notification
-        showStatus(statusElementId, `Error registering student: ${error.message}`, 'error');
-    }
+    // Clear input fields
+    document.getElementById('newStudentName').value = '';
+    
+    // Optional: Refresh the student list if you have a display function
+    // loadStudentList(studentClass); 
 });
 
 // =================================================================
-// 6. INITIAL DATA LOADERS (Place your data loading functions here)
+// 5. INITIAL DATA LOADERS
 // =================================================================
 
-// Example function placeholders for class dropdowns, etc.
-// function loadClassesDropdowns() { /* ... code to fetch and populate SELECT elements ... */ }
-// function loadStudentList(classId) { /* ... code to fetch and populate student table ... */ }
+/**
+ * Populates all class SELECT elements using data from localData.classes
+ */
+function loadClassesDropdowns() {
+    const classSelectors = document.querySelectorAll(
+        '#attClass, #gradeClass, #newStudentClass, #adminStudentClassSelect, #lookupClass'
+    );
+    
+    classSelectors.forEach(selectEl => {
+        // Clear existing options
+        selectEl.innerHTML = '<option value="">-- Select Class --</option>'; 
+        
+        localData.classes.forEach(className => {
+            const option = document.createElement('option');
+            option.value = className;
+            option.textContent = className;
+            selectEl.appendChild(option);
+        });
+    });
+}
 
-// Call initial data loaders on page load (but outside the auth listener)
-// document.addEventListener('DOMContentLoaded', loadClassesDropdowns);
 
+// =================================================================
+// 6. INITIALIZATION
+// =================================================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    initLocalData();
+    handleAuthStateChange(); // Check initial state (will default to logged out)
+});
