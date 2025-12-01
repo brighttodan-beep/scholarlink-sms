@@ -154,16 +154,17 @@ document.getElementById('loginBtn').addEventListener('click', () => {
     const userEntry = LOCAL_USERS[email];
     
     if (userEntry && userEntry.password === password) {
-        // Simulated successful login
+        // SUCCESS: Define currentUser and switch view
         currentUser = { email: email, role: userEntry.role, uid: email.replace('@', '_') };
         authStatus.textContent = 'Login successful!';
-        // Use a timeout to simulate network delay before state change
-        setTimeout(handleAuthStateChange, 500); 
+        
+        // Use a slight delay to ensure the success message is seen
+        setTimeout(handleAuthStateChange, 400); 
         
     } else {
-        // Simulated failed login
+        // FAILURE: Clear credentials and show error
         currentUser = null;
-        authStatus.textContent = `Error: Invalid email or password.`;
+        authStatus.textContent = `Error: Invalid email or password. Please try again.`;
     }
 });
 
@@ -248,4 +249,5 @@ document.addEventListener('DOMContentLoaded', () => {
     initLocalData();
     handleAuthStateChange(); // Check initial state (will default to logged out)
 });
+
 
