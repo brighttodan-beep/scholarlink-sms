@@ -161,6 +161,7 @@ function switchModule(moduleId) {
         loadGradingItems();
     } else if (moduleId === 'headmaster-dashboard') {
         loadDashboardSummary(); 
+        // CORRECTED: Ensure we load the student list whenever the dashboard is shown
         if(newStudentClassEl) loadStudentsByClass(newStudentClassEl.value); 
     }
     
@@ -216,12 +217,21 @@ async function initializeApplicationLogic(user) {
         if (saveGradesBtn) saveGradesBtn.addEventListener('click', handleSaveGrades);
         if (lookupBtn) lookupBtn.addEventListener('click', handleLookupRecords);
         if (addStudentBtn) addStudentBtn.addEventListener('click', handleAddStudent);
-        if (newStudentClassEl) newStudentClassEl.addEventListener('change', loadStudentsByClass);
+        
+        // **CORRECTION HERE:** Attach the load function to the change event.
+        if (newStudentClassEl) newStudentClassEl.addEventListener('change', () => loadStudentsByClass(newStudentClassEl.value));
         
         // Start on the first active module based on the role
         const firstActiveModuleButton = document.querySelector('.tab-btn:not(.hidden)');
         if (firstActiveModuleButton) {
-            switchModule(firstActiveModuleButton.getAttribute('data-module'));
+            const firstModuleId = firstActiveModuleButton.getAttribute('data-module');
+            switchModule(firstModuleId);
+            
+            // **CRITICAL FIX:** If the starting module is the dashboard, ensure the student list loads immediately.
+            if (firstModuleId === 'headmaster-dashboard' && newStudentClassEl) {
+                // Ensure the value is set before attempting to load
+                loadStudentsByClass(newStudentClassEl.value); 
+            }
         }
 
 
@@ -686,8 +696,18 @@ async function handleAddStudent() {
     }
 }
 
-async function loadStudentsByClass(selectedClass = newStudentClassEl.value) {
-    if (!auth.currentUser || !studentListBodyEl || !newStudentClassEl || !userSchoolId) return;
+async function loadStudentsByClass(selectedClass) {
+    // FIX: Ensure selectedClass is a string, if no value is passed (e.g., initial load) use the current dropdown value
+    if (!selectedClass) {
+        if (newStudentClassEl && newStudentClassEl.value) {
+            selectedClass = newStudentClassEl.value;
+        } else {
+            console.warn("loadStudentsByClass called without a valid class value.");
+            return;
+        }
+    }
+
+    if (!auth.currentUser || !studentListBodyEl || !userSchoolId) return;
     
     try {
         const snapshot = await db.collection(STUDENTS_COLLECTION)
