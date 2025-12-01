@@ -1,16 +1,16 @@
-// main.js - FINAL MULTI-TENANCY & RBAC VERSION with DEBUGGING LOGS.
+// --- START OF COMPLETE REPLACEMENT CODE: js/main.js ---
 
 // --- FIREBASE CONFIGURATION & INITIALIZATION ---
 
-// REPLACE THIS OBJECT WITH YOUR ACTUAL FIREBASE CONFIGURATION!
+// !!! IMPORTANT: REPLACE ALL KEYS IN THIS OBJECT WITH YOUR ACTUAL FIREBASE CONFIG !!!
 const firebaseConfig = {
-    apiKey: "AIzaSyDt1nGhKNXz6bLfLILUfJ_RnfD45_VgVX0", 
-    authDomain: "scholarlink-sms-app.firebaseapp.com",
-    projectId: "scholarlink-sms-app",
-    storageBucket: "scholarlink-sms-app.firebasestorage.app",
-    messagingSenderId: "866758277016",
-    appId: "1:866758277016:web:c848393d8a0cce4ea5dded",
-    measurementId: "G-NLKTVVVQGZ"
+    apiKey: "YOUR_API_KEY_HERE", // Example: "AIzaSyDt1nGhKNXz6bLfLILUfJ_RnfD45_VgVX0",
+    authDomain: "YOUR_AUTH_DOMAIN_HERE.firebaseapp.com", // Example: "scholarlink-sms-app.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID_HERE", // Example: "scholarlink-sms-app",
+    storageBucket: "YOUR_STORAGE_BUCKET_HERE.firebasestorage.app",
+    messagingSenderId: "YOUR_SENDER_ID_HERE",
+    appId: "YOUR_APP_ID_HERE",
+    measurementId: "YOUR_MEASUREMENT_ID_HERE"
 };
 // --- END FIREBASE CONFIGURATION ---
 
@@ -202,11 +202,11 @@ function attachGlobalListeners() {
 async function initializeApplicationLogic(user) {
     // 1. Fetch User Profile
     try {
-        console.log(`[DEBUG] Attempting to fetch user profile for UID: ${user.uid}`); // DEBUG LOG
+        console.log(`[DEBUG] Step 1: Attempting to fetch user profile for UID: ${user.uid}`); // DEBUG LOG
         const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
         
         if (!userDoc.exists) {
-            console.error(`[FATAL] User document not found in ${USERS_COLLECTION} for UID: ${user.uid}`); // DEBUG LOG
+            console.error(`[FATAL] Step 2: User document NOT found in ${USERS_COLLECTION} for UID: ${user.uid}`); // DEBUG LOG
             alert("Account not provisioned. Please contact your school administrator.");
             handleLogout(); 
             return;
@@ -217,13 +217,13 @@ async function initializeApplicationLogic(user) {
         userRole = userData.role; 
         
         if (!userSchoolId || !userRole) {
-             console.error(`[FATAL] User profile is incomplete. schoolId: ${userSchoolId}, role: ${userRole}`); // DEBUG LOG
+             console.error(`[FATAL] Step 3: User profile is incomplete. schoolId: ${userSchoolId}, role: ${userRole}`); // DEBUG LOG
              alert("Account profile is incomplete (missing role or school ID). Please contact administrator.");
              handleLogout(); 
              return;
         }
 
-        console.log(`[DEBUG] User profile loaded. Role: ${userRole}, SchoolID: ${userSchoolId}`); // DEBUG LOG
+        console.log(`[DEBUG] Step 4: User profile loaded successfully. Role: ${userRole}, SchoolID: ${userSchoolId}`); // DEBUG LOG
 
         // 2. Swap Views: Hide login, Show App
         if (authSectionEl) authSectionEl.classList.add('hidden');
@@ -296,7 +296,8 @@ async function handleLogin() {
         await auth.signInWithEmailAndPassword(email, password);
         // auth.onAuthStateChanged handles the rest
     } catch (error) {
-        console.error("[Login Auth Error]:", error); // DEBUG LOG
+        // THIS IS THE CRITICAL LINE THAT REPORTS THE AUTHENTICATION PROBLEM!
+        console.error("[Login Auth Error]:", error); 
         updateStatus(`Login Error: ${error.message}`, 'error');
     }
 }
@@ -568,4 +569,217 @@ async function handleLookupRecords() {
                 totalDays++;
                 if (record.status === 'Present') presentCount++;
                 else if (record.status === 'Absent') absentCount++;
-                else if (
+                else if (record.status === 'Late') lateCount++;
+            }
+        });
+
+        if (totalDays > 0) {
+            attendanceSummaryEl.innerHTML = `
+                <li>Total Days Logged: <strong>${totalDays}</strong></li>
+                <li>Present: <strong>${presentCount}</strong></li>
+                <li>Absent: <strong>${absentCount}</strong></li>
+                <li>Late: <strong>${lateCount}</strong></li>
+            `;
+        } else {
+            attendanceSummaryEl.innerHTML = '<li>No attendance data found for this student.</li>';
+        }
+
+    } catch (error) {
+        console.error("Attendance lookup error:", error);
+        attendanceSummaryEl.innerHTML = '<li>Error loading attendance data.</li>';
+    }
+
+
+    // --- B. Fetch Grade Records ---
+    try {
+        const gradesSnapshot = await db.collection(GRADES_COLLECTION)
+            .where('schoolId', '==', userSchoolId)
+            .where('class', '==', lookupClass)
+            .get();
+
+        let foundGrades = [];
+
+        gradesSnapshot.forEach(doc => {
+            const gradeEntry = doc.data();
+            const studentGrade = gradeEntry.grades.find(g => g.student.toLowerCase() === lookupName.toLowerCase());
+            if (studentGrade) {
+                foundGrades.push({
+                    item: gradeEntry.gradingItemName,
+                    score: studentGrade.score,
+                    max: studentGrade.max
+                });
+            }
+        });
+
+        if (foundGrades.length > 0) {
+            gradesSummaryBodyEl.innerHTML = foundGrades.map(grade => `
+                <tr>
+                    <td>${grade.item}</td>
+                    <td>${grade.score}</td>
+                    <td>${grade.max}</td>
+                </tr>
+            `).join('');
+        } else {
+            gradesSummaryBodyEl.innerHTML = '<tr><td colspan="3">No grades found for this student.</td></tr>';
+        }
+        
+        updateStatus(`Records loaded for ${lookupName}.`);
+
+    } catch (error) {
+        console.error("Grades lookup error:", error);
+        gradesSummaryBodyEl.innerHTML = '<tr><td colspan="3">Error loading grades data.</td></tr>';
+        updateStatus("Error fetching grades.", 'error');
+    }
+}
+
+
+// --- 7. ADMIN/STUDENT MANAGEMENT LOGIC (Placeholders) ---
+
+async function loadStudentsByClass(selectedClass) {
+    if (!auth.currentUser || !studentListBodyEl || !userSchoolId) return;
+
+    updateStatus(`Loading student list for class ${selectedClass}...`, 'info');
+    studentListBodyEl.innerHTML = '<tr><td colspan="2">Loading...</td></tr>';
+
+    try {
+        const snapshot = await db.collection(STUDENTS_COLLECTION)
+            .where('schoolId', '==', userSchoolId)
+            .where('class', '==', selectedClass)
+            .orderBy('name', 'asc')
+            .get();
+
+        const students = snapshot.docs.map(doc => doc.data());
+        
+        studentListBodyEl.innerHTML = '';
+
+        if (students.length === 0) {
+            studentListBodyEl.innerHTML = '<tr><td colspan="2">No students registered in this class.</td></tr>';
+        } else {
+            students.forEach((student) => {
+                const row = studentListBodyEl.insertRow();
+                row.insertCell(0).textContent = student.name;
+                row.insertCell(1).textContent = student.class;
+            });
+            updateStatus(`${students.length} students loaded for ${selectedClass}.`);
+        }
+
+    } catch (error) {
+        console.error("Error loading student list:", error);
+        studentListBodyEl.innerHTML = '<tr><td colspan="2">Error loading student list.</td></tr>';
+        updateStatus(`Error loading student list: ${error.message}`, 'error');
+    }
+}
+
+async function handleAddStudent() {
+    if (!auth.currentUser || !newStudentNameEl || !newStudentClassEl || !userSchoolId) return;
+
+    const studentName = newStudentNameEl.value.trim();
+    const studentClass = newStudentClassEl.value;
+
+    if (!studentName || !studentClass) {
+        updateStatus("Error: Student Name and Class are required.", 'error');
+        return;
+    }
+
+    const docId = `${userSchoolId}_${studentClass}_${studentName.replace(/\s/g, '_')}`;
+
+    const studentData = {
+        name: studentName,
+        class: studentClass,
+        schoolId: userSchoolId,
+        addedBy: auth.currentUser.email,
+        addedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    updateStatus(`Attempting to add student ${studentName}...`, 'info');
+
+    try {
+        await db.collection(STUDENTS_COLLECTION).doc(docId).set(studentData);
+        
+        updateStatus(`SUCCESS! Student ${studentName} added to ${studentClass}.`, 'success');
+
+        newStudentNameEl.value = '';
+        
+        if (adminStudentClassSelectEl) loadStudentsByClass(adminStudentClassSelectEl.value);
+
+    } catch (error) {
+        console.error("Firebase Add Student Error:", error);
+        updateStatus(`ERROR adding student: ${error.message}`, 'error');
+    }
+}
+
+
+// --- 8. HEADMASTER DASHBOARD LOGIC (Placeholders) ---
+
+async function loadDashboardSummary() {
+    if (!auth.currentUser || !userSchoolId) return;
+
+    updateStatus("Loading dashboard statistics...", 'info');
+
+    try {
+        // Metric 1: Total Teachers (Filter by role and school)
+        const teacherSnapshot = await db.collection(USERS_COLLECTION)
+            .where('schoolId', '==', userSchoolId)
+            .where('role', '==', 'Teacher')
+            .get();
+        if (totalTeachersEl) totalTeachersEl.textContent = teacherSnapshot.size;
+
+        // Metric 2 & 3: Attendance Summary 
+        const attendanceSnapshot = await db.collection(ATTENDANCE_COLLECTION)
+            .where('schoolId', '==', userSchoolId)
+            .get();
+        
+        let totalDaysLogged = attendanceSnapshot.size;
+        let totalAttendanceEntries = 0;
+        let totalPresent = 0;
+        
+        attendanceSnapshot.forEach(doc => {
+            const record = doc.data();
+            totalAttendanceEntries += record.records.length;
+            totalPresent += record.records.filter(r => r.status === 'Present').length;
+        });
+
+        if (totalAttendanceDaysEl) totalAttendanceDaysEl.textContent = totalDaysLogged;
+        
+        let avgRate = (totalAttendanceEntries > 0) 
+            ? ((totalPresent / totalAttendanceEntries) * 100).toFixed(1) 
+            : '0.0';
+        if (avgAttendanceRateEl) avgAttendanceRateEl.textContent = `${avgRate}%`;
+
+
+        // Metric 4: Recent Grade Entries 
+        const gradesSnapshot = await db.collection(GRADES_COLLECTION)
+            .where('schoolId', '==', userSchoolId)
+            .orderBy('savedAt', 'desc')
+            .limit(5)
+            .get();
+
+        if (recentGradesBodyEl) recentGradesBodyEl.innerHTML = '';
+        
+        if (gradesSnapshot.empty) {
+            recentGradesBodyEl.innerHTML = '<tr><td colspan="4">No recent grades.</td></tr>';
+        } else {
+            gradesSnapshot.forEach(doc => {
+                const gradeEntry = doc.data();
+                const count = gradeEntry.grades ? gradeEntry.grades.length : 0;
+                const row = recentGradesBodyEl.insertRow();
+                row.insertCell(0).textContent = gradeEntry.gradingItemName;
+                row.insertCell(1).textContent = gradeEntry.class;
+                row.insertCell(2).textContent = count;
+                row.insertCell(3).textContent = gradeEntry.savedBy.split('@')[0];
+            });
+        }
+        
+        updateStatus("Dashboard summary loaded.", 'success');
+
+    } catch (error) {
+        console.error("Dashboard load error:", error);
+        updateStatus(`Dashboard Error: ${error.message}`, 'error');
+    }
+}
+
+
+// --- EVENT LISTENER ATTACHMENT ---
+if (loginBtn) loginBtn.addEventListener('click', handleLogin);
+
+// --- END OF COMPLETE REPLACEMENT CODE: js/main.js ---
