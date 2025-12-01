@@ -685,22 +685,28 @@ async function loadStudentsByClass(selectedClass) {
 }
 
 async function handleAddStudent() {
-    if (!auth.currentUser || !newStudentNameEl || !newStudentClassEl || !userSchoolId) return;
+    // CRITICAL CHECK: Ensure all required elements exist and user is logged in
+    if (!auth.currentUser || !newStudentNameEl || !newStudentClassEl || !userSchoolId) {
+        updateStatus("System Error: Required elements or login data are missing.", 'error');
+        console.error("handleAddStudent failed due to missing DOM elements or user data.");
+        return;
+    }
 
     const studentName = newStudentNameEl.value.trim();
     const studentClass = newStudentClassEl.value;
 
     if (!studentName || !studentClass) {
-        updateStatus("Error: Student Name and Class are required.", 'error');
-        return;
+        updateStatus("Error: Student Name and Class are required fields.", 'error');
+        return; // Stop execution if fields are empty
     }
 
+    // Creating a unique ID for the student document in the database
     const docId = `${userSchoolId}_${studentClass}_${studentName.replace(/\s/g, '_')}`;
 
     const studentData = {
         name: studentName,
         class: studentClass,
-        schoolId: userSchoolId,
+        schoolId: userSchoolId, // Ensures the student belongs to your school
         addedBy: auth.currentUser.email,
         addedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
@@ -712,16 +718,19 @@ async function handleAddStudent() {
         
         updateStatus(`SUCCESS! Student ${studentName} added to ${studentClass}.`, 'success');
 
-        newStudentNameEl.value = '';
-        
-        if (adminStudentClassSelectEl) loadStudentsByClass(adminStudentClassSelectEl.value);
+        newStudentNameEl.value = ''; // Clear the input field
+
+        // Refresh the list if we are currently viewing the student management tab
+        const currentModule = document.querySelector('.module-section.active');
+        if (currentModule && currentModule.id === 'student-management' && adminStudentClassSelectEl) {
+             loadStudentsByClass(adminStudentClassSelectEl.value); 
+        }
 
     } catch (error) {
         console.error("Firebase Add Student Error:", error);
         updateStatus(`ERROR adding student: ${error.message}`, 'error');
     }
 }
-
 
 // --- 8. HEADMASTER DASHBOARD LOGIC (Placeholders) ---
 
@@ -796,3 +805,4 @@ async function loadDashboardSummary() {
 // --- ATTACH LISTENERS ON WINDOW LOAD TO ENSURE ALL ELEMENTS ARE READY ---
 window.onload = attachGlobalListeners;
 // --- END OF COMPLETE & FINAL CODE: js/main.js ---
+
