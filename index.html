@@ -1,129 +1,255 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ScholarLink - School Management</title>
-    <link rel="stylesheet" href="css/style.css"> 
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScholarLink - School Management</title>
+    <link rel="stylesheet" href="css/style.css"> 
 </head>
 <body>
 
-    <div id="auth-section" class="login-container">
-        <div class="login-box">
-            <h2>ScholarLink Login</h2>
-            <div id="auth-status" class="status-message">Please log in. (Registration is disabled)</div>
-            <div class="form-group">
-                <label for="loginEmail">Email</label>
-                <input type="email" id="loginEmail" placeholder="Enter your email" required>
-            </div>
-            <div class="form-group">
-                <label for="loginPassword">Password</label>
-                <input type="password" id="loginPassword" placeholder="Enter your password" required>
-            </div>
-            <button id="loginBtn" class="btn btn-primary">Log In</button>
-        </div>
-    </div>
+    <div id="auth-section" class="login-container">
+        <div class="login-box">
+            <h2>ScholarLink Login</h2>
+            <div id="auth-status" class="status-message">Please log in. (Registration is disabled)</div>
+            <div class="form-group">
+                <label for="loginEmail">Email</label>
+                <input type="email" id="loginEmail" placeholder="Enter your email" required>
+            </div>
+            <div class="form-group">
+                <label for="loginPassword">Password</label>
+                <input type="password" id="loginPassword" placeholder="Enter your password" required>
+            </div>
+            <button id="loginBtn" class="btn btn-primary">Log In</button>
+        </div>
+    </div>
 
-    <div id="app-section" class="app-layout hidden">
-        
-        <header class="app-header">
-            <h1>ScholarLink</h1>
-            <div class="user-info">
-                <span>Logged in as: <strong id="userName">User</strong></span>
-                <button id="logoutBtn" class="btn btn-danger btn-small">Logout</button>
-            </div>
-        </header>
+    <div id="app-section" class="app-layout hidden">
+        
+        <header class="app-header">
+            <h1>ScholarLink</h1>
+            <div class="user-info">
+                <span>Logged in as: <strong id="userName">User</strong></span>
+                <button id="logoutBtn" class="btn btn-danger btn-small">Logout</button>
+            </div>
+        </header>
 
-        <div class="app-content">
-            <nav class="sidebar">
-                <button class="tab-btn active" data-module="attendance">Attendance Management</button>
-                <button class="tab-btn" data-module="grade">Gradebook</button>
-                <button class="tab-btn" data-module="student-management">👨‍🎓 Student Management</button>                 <button class="tab-btn" data-module="parent-portal">Parent Portal</button>
-                <button class="tab-btn" data-module="headmaster-dashboard">Dashboard & Setup</button>
-            </nav>
+        <div class="app-content">
+            <nav class="sidebar">
+                <button class="tab-btn active" data-module="attendance">Attendance Management</button>
+                <button class="tab-btn" data-module="grade">Gradebook</button>
+                <button class="tab-btn" data-module="student-management">👨‍🎓 Student Management</button> 
+                <button class="tab-btn" data-module="parent-portal">Parent Portal</button>
+                <button class="tab-btn" data-module="headmaster-dashboard">Dashboard & Setup</button>
+            </nav>
 
-            <main class="main-content">
-                
-                <section id="attendance" class="module-section active">
-                    <h2>Attendance Management</h2>
-                    <div class="module-control">
-                        <div class="form-group">
-                            <label for="attClass">Select Class</label>
-                            <select id="attClass"></select>
-                        </div>
-                        <div class="form-group">
-                            <label for="attDate">Date</label>
-                            <input type="date" id="attDate" value="2025-01-01">
-                        </div>
-                        <button id="loadStudentsBtn" class="btn btn-primary">Load Students</button>
-                    </div>
-                    
-                    <div class="table-responsive">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Student Name</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="attendanceTableBody">
-                                <tr><td colspan="2">Select a class and date to load students.</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <button id="saveAttendanceBtn" class="btn btn-success" disabled>Save Attendance</button>
-                </section>
+            <main class="main-content">
+                
+                <section id="attendance" class="module-section active">
+                    <h2>Attendance Management</h2>
+                    <div class="module-control">
+                        <div class="form-group">
+                            <label for="attClass">Select Class</label>
+                            <select id="attClass"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="attDate">Date</label>
+                            <input type="date" id="attDate" value="2025-01-01">
+                        </div>
+                        <button id="loadStudentsBtn" class="btn btn-primary">Load Students</button>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Student Name</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="attendanceTableBody">
+                                <tr><td colspan="2">Select a class and date to load students.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <button id="saveAttendanceBtn" class="btn btn-success" disabled>Save Attendance</button>
+                </section>
 
-                <section id="grade" class="module-section">
-                    <h2>Gradebook Management</h2>
-                    
-                    <h3>Add Grading Item</h3>
-                    <div class="module-control">
-                        <div class="form-group">
-                            <label for="gradeSubject">Subject</label>
-                            <input type="text" id="gradeSubject" placeholder="Math">
-                        </div>
-                        <div class="form-group">
-                            <label for="gradeItemName">Item Name</label>
-                            <input type="text" id="gradeItemName" placeholder="Midterm Exam">
-                        </div>
-                        <div class="form-group">
-                            <label for="totalMarks">Total Marks</label>
-                            <input type="number" id="totalMarks" placeholder="100">
-                        </div>
-                        <button id="addGradeItemBtn" class="btn btn-primary">Add Item</button>
-                    </div>
+                <section id="grade" class="module-section">
+                    <h2>Gradebook Management</h2>
+                    
+                    <h3>Add Grading Item</h3>
+                    <div class="module-control">
+                        <div class="form-group">
+                            <label for="gradeSubject">Subject</label>
+                            <input type="text" id="gradeSubject" placeholder="Math">
+                        </div>
+                        <div class="form-group">
+                            <label for="gradeItemName">Item Name</label>
+                            <input type="text" id="gradeItemName" placeholder="Midterm Exam">
+                        </div>
+                        <div class="form-group">
+                            <label for="totalMarks">Total Marks</label>
+                            <input type="number" id="totalMarks" placeholder="100">
+                        </div>
+                        <button id="addGradeItemBtn" class="btn btn-primary">Add Item</button>
+                    </div>
 
-                    <h3>Record Grades</h3>
-                    <div class="module-control">
-                        <div class="form-group">
-                            <label for="gradingItemSelect">Select Item</label>
-                            <select id="gradingItemSelect">
-                                <option value="">-- Select Test/Assignment --</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="gradeClass">Select Class</label>
-                            <select id="gradeClass"></select>
-                        </div>
-                        <button id="loadGradeStudentsBtn" class="btn btn-primary">Load Students for Grading</button>
-                    </div>
-                    
-                    <div class="table-responsive">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Student Name</th>
-                                    <th>Score</th>
-                                </tr>
-                            </thead>
-                            <tbody id="gradesTableBody">
-                                <tr><td colspan="2">Load students to enter grades.</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <button id="saveGradesBtn" class="btn btn-success" disabled>Save Grades</button>
-                </section>
+                    <h3>Record Grades</h3>
+                    <div class="module-control">
+                        <div class="form-group">
+                            <label for="gradingItemSelect">Select Item</label>
+                            <select id="gradingItemSelect">
+                                <option value="">-- Select Test/Assignment --</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="gradeClass">Select Class</label>
+                            <select id="gradeClass"></select>
+                        </div>
+                        <button id="loadGradeStudentsBtn" class="btn btn-primary">Load Students for Grading</button>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Student Name</th>
+                                    <th>Score</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gradesTableBody">
+                                <tr><td colspan="2">Load students to enter grades.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <button id="saveGradesBtn" class="btn btn-success" disabled>Save Grades</button>
+                </section>
 
                 <section id="student-management" class="module-section">
-                    <h2>Student Registration & Class List</h2>
+                    <h2>Student Registration & Class List</h2>
+                    <h3>Register New Student</h3>
+                    <div class="module-control">
+                        <div class="form-group">
+                            <label for="newStudentName">Name</label>
+                            <input type="text" id="newStudentName" placeholder="Full Name">
+                        </div>
+                        <div class="form-group">
+                            <label for="newStudentClass">Class</label>
+                            <select id="newStudentClass"></select>
+                        </div>
+                        <button id="addStudentBtn" class="btn btn-primary">Add Student</button>
+                    </div>
+
+                    <h3>View Students by Class</h3>
+                    <div class="module-control">
+                        <div class="form-group">
+                            <label for="adminStudentClassSelect">Select Class to View</label>
+                            <select id="adminStudentClassSelect"></select>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Class</th>
+                                </tr>
+                            </thead>
+                            <tbody id="studentListBodyEl">
+                                <tr><td colspan="2">Select a class to load the list.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+                
+                <section id="parent-portal" class="module-section">
+                    <h2>Parent/Student Portal Lookup</h2>
+                    <div class="module-control">
+                        <div class="form-group">
+                            <label for="lookupName">Student Name</label>
+                            <input type="text" id="lookupName" placeholder="Enter student's full name">
+                        </div>
+                        <div class="form-group">
+                            <label for="lookupClass">Student Class</label>
+                            <select id="lookupClass"></select>
+                        </div>
+                        <button id="lookupBtn" class="btn btn-primary">Lookup Records</button>
+                    </div>
+                    
+                    <h3>Records for: <span id="studentNameDisplay"></span></h3>
+                    
+                    <div class="summary-box">
+                        <h4>Attendance Summary</h4>
+                        <ul id="attendanceSummary">
+                            <li>No lookup performed.</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="summary-box">
+                        <h4>Grade Summary</h4>
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Item</th>
+                                        <th>Score</th>
+                                        <th>Max</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="gradesSummaryBodyEl">
+                                    <tr><td colspan="3">No grades found.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="headmaster-dashboard" class="module-section">
+                    <h2>Headmaster Dashboard & System Summary</h2>
+                    
+                    <div class="dashboard-grid">
+                        <div class="metric-card">
+                            <h4>Total Teachers</h4>
+                            <p id="totalTeachers">...</p>
+                        </div>
+                        <div class="metric-card">
+                            <h4>Attendance Days Logged</h4>
+                            <p id="totalAttendanceDays">...</p>
+                        </div>
+                        <div class="metric-card">
+                            <h4>Average Attendance Rate</h4>
+                            <p id="avgAttendanceRate">...</p>
+                        </div>
+                    </div>
+
+                    <h3>Recent Grade Entries</h3>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Class</th>
+                                    <th>Count</th>
+                                    <th>Saved By</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentGradesBodyEl">
+                                <tr><td colspan="4">Loading dashboard data...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+                
+            </main>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/7.23.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.23.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.23.0/firebase-firestore.js"></script>
+    
+    <script src="js/main.js"></script>
+    
+</body>
+</html>
