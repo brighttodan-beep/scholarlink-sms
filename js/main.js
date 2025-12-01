@@ -144,12 +144,12 @@ function handleAuthStateChange() {
     }
 }
 
-document.getElementById('loginBtn').addEventListener('click', async () => {
-    const email = document.getElementById('loginEmail').value;
+document.getElementById('loginBtn').addEventListener('click', () => {
+    const email = document.getElementById('loginEmail').value.trim(); // Added .trim()
     const password = document.getElementById('loginPassword').value;
     const authStatus = document.getElementById('auth-status');
     
-    authStatus.textContent = 'Logging in...';
+    authStatus.textContent = 'Verifying credentials...';
 
     const userEntry = LOCAL_USERS[email];
     
@@ -248,3 +248,4 @@ document.addEventListener('DOMContentLoaded', () => {
     initLocalData();
     handleAuthStateChange(); // Check initial state (will default to logged out)
 });
+
