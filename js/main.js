@@ -127,19 +127,23 @@ document.querySelectorAll('.tab-btn').forEach(button => {
 // 4. AUTHENTICATION & ROLE CHECK
 // =================================================================
 
+// --- In js/main.js (Section 4) ---
+
 // Authentication state listener: runs on page load and on login/logout
 auth.onAuthStateChanged(user => {
     const authSection = document.getElementById('auth-section');
     const appSection = document.getElementById('app-section');
 
     if (user) {
+        // !!! COPY THIS UID FROM THE CONSOLE !!!
+        console.log("LOGGED-IN USER UID:", user.uid); // <-- NEW LINE ADDED HERE
         // User is logged in. Fetch role and display app.
         authSection.classList.add('hidden');
         
         // Fetch role from Firestore (Crucial step that relies on the rules!)
         db.collection('users').doc(user.uid).get()
             .then(doc => {
-                const userRole = doc.data()?.role || 'guest'; // Default to 'guest' if role is missing/profile not found
+                const userRole = doc.data()?.role || 'guest';
                 
                 document.getElementById('userName').textContent = `${user.email} (${userRole})`;
                 
@@ -150,8 +154,7 @@ auth.onAuthStateChanged(user => {
             })
             .catch(error => {
                 console.error("Error fetching user role:", error);
-                // If fetching the user profile fails (e.g., due to strict rules),
-                // we treat them as a guest to prevent app display for unprovisioned users.
+                // On permission denied (likely happening now), defaults to guest
                 applyRolePermissions('guest'); 
                 appSection.classList.remove('hidden');
             });
@@ -248,3 +251,4 @@ document.getElementById('addStudentBtn').addEventListener('click', async () => {
         }
     }
 });
+
