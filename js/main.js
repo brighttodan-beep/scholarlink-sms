@@ -6,12 +6,13 @@
 // REPLACE with your Firebase project credentials. You get these from your
 // Firebase Project Settings -> General -> Your Apps.
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyDt1nGhKNXz6bLfLILUfJ_RnfD45_VgVX0",
+  authDomain: "scholarlink-sms-app.firebaseapp.com",
+  projectId: "scholarlink-sms-app",
+  storageBucket: "scholarlink-sms-app.firebasestorage.app",
+  messagingSenderId: "866758277016",
+  appId: "1:866758277016:web:c848393d8a0cce4ea5dded",
+  measurementId: "G-NLKTVVVQGZ"
 };
 
 // Initialize Firebase
@@ -262,3 +263,4 @@ document.getElementById('addStudentBtn').addEventListener('click', async () => {
 
 // Call initial data loaders on page load (but outside the auth listener)
 // document.addEventListener('DOMContentLoaded', loadClassesDropdowns);
+
