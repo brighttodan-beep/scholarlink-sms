@@ -2,7 +2,7 @@
 
 // --- FIREBASE CONFIGURATION & INITIALIZATION ---
 
-// !!! IMPORTANT: REPLACE ALL KEYS IN THIS OBJECT WITH YOUR ACTUAL FIREBASE CONFIG !!!
+// !!! IMPORTANT: YOU MUST REPLACE ALL KEYS IN THIS OBJECT WITH YOUR ACTUAL FIREBASE CONFIG !!!
 const firebaseConfig = {
     apiKey: "YOUR_API_KEY_HERE", // Example: "AIzaSyDt1nGhKNXz6bLfLILUfJ_RnfD45_VgVX0",
     authDomain: "YOUR_AUTH_DOMAIN_HERE.firebaseapp.com", // Example: "scholarlink-sms-app.firebaseapp.com",
@@ -15,7 +15,15 @@ const firebaseConfig = {
 // --- END FIREBASE CONFIGURATION ---
 
 // Initialize Firebase
-firebase.initializeApp(firebaseConfig);
+try {
+    firebase.initializeApp(firebaseConfig);
+    console.log("[STATUS] Firebase App Initialized Successfully.");
+} catch (e) {
+    console.error("[FATAL ERROR] Firebase Initialization Failed. Check firebaseConfig object.", e);
+    // Exit if initialization fails to prevent crashes later
+    alert("System Error: Could not connect to the database. Check console for details.");
+}
+
 
 // Database and Authentication References
 const db = firebase.firestore();
@@ -195,6 +203,14 @@ function attachGlobalListeners() {
     if (adminStudentClassSelectEl) {
         adminStudentClassSelectEl.addEventListener('change', () => loadStudentsByClass(adminStudentClassSelectEl.value));
     }
+    
+    // CRITICAL FIX: Ensure the login button listener is attached here after all elements are defined
+    if (loginBtn) {
+        loginBtn.addEventListener('click', handleLogin);
+        console.log("[DEBUG] Login button listener attached.");
+    } else {
+        console.error("[FATAL] Login button element (ID: 'loginBtn') not found.");
+    }
 }
 
 // --- 3. AUTHENTICATION LOGIC (Updated for Multi-Tenancy & RBAC) ---
@@ -202,11 +218,11 @@ function attachGlobalListeners() {
 async function initializeApplicationLogic(user) {
     // 1. Fetch User Profile
     try {
-        console.log(`[DEBUG] Step 1: Attempting to fetch user profile for UID: ${user.uid}`); // DEBUG LOG
+        console.log(`[DEBUG] Step 1: Attempting to fetch user profile for UID: ${user.uid}`); 
         const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
         
         if (!userDoc.exists) {
-            console.error(`[FATAL] Step 2: User document NOT found in ${USERS_COLLECTION} for UID: ${user.uid}`); // DEBUG LOG
+            console.error(`[FATAL] Step 2: User document NOT found in ${USERS_COLLECTION} for UID: ${user.uid}`); 
             alert("Account not provisioned. Please contact your school administrator.");
             handleLogout(); 
             return;
@@ -217,13 +233,13 @@ async function initializeApplicationLogic(user) {
         userRole = userData.role; 
         
         if (!userSchoolId || !userRole) {
-             console.error(`[FATAL] Step 3: User profile is incomplete. schoolId: ${userSchoolId}, role: ${userRole}`); // DEBUG LOG
+             console.error(`[FATAL] Step 3: User profile is incomplete. schoolId: ${userSchoolId}, role: ${userRole}`); 
              alert("Account profile is incomplete (missing role or school ID). Please contact administrator.");
              handleLogout(); 
              return;
         }
 
-        console.log(`[DEBUG] Step 4: User profile loaded successfully. Role: ${userRole}, SchoolID: ${userSchoolId}`); // DEBUG LOG
+        console.log(`[DEBUG] Step 4: User profile loaded successfully. Role: ${userRole}, SchoolID: ${userSchoolId}`); 
 
         // 2. Swap Views: Hide login, Show App
         if (authSectionEl) authSectionEl.classList.add('hidden');
@@ -254,7 +270,7 @@ async function initializeApplicationLogic(user) {
 
 
     } catch (error) {
-        console.error("[Initialization Error]:", error); // DEBUG LOG
+        console.error("[Initialization Error]:", error); 
         updateStatus(`Fatal Initialization Error: ${error.message}`, 'error');
         handleLogout();
     }
@@ -273,10 +289,10 @@ function resetApplicationView() {
 // Primary listener that handles login/logout and initialization
 auth.onAuthStateChanged(user => {
     if (user) {
-        console.log(`[DEBUG] auth.onAuthStateChanged: User is logged in. UID: ${user.uid}`); // DEBUG LOG
+        console.log(`[DEBUG] auth.onAuthStateChanged: User is logged in. UID: ${user.uid}`); 
         initializeApplicationLogic(user);
     } else {
-        console.log("[DEBUG] auth.onAuthStateChanged: User is logged out."); // DEBUG LOG
+        console.log("[DEBUG] auth.onAuthStateChanged: User is logged out."); 
         resetApplicationView();
     }
 });
@@ -292,7 +308,7 @@ async function handleLogin() {
     
     try {
         updateStatus('Signing in...', 'info');
-        console.log(`[DEBUG] Attempting Firebase Auth signIn for: ${email}`); // DEBUG LOG
+        console.log(`[DEBUG] Attempting Firebase Auth signIn for: ${email}`); 
         await auth.signInWithEmailAndPassword(email, password);
         // auth.onAuthStateChanged handles the rest
     } catch (error) {
@@ -779,7 +795,6 @@ async function loadDashboardSummary() {
 }
 
 
-// --- EVENT LISTENER ATTACHMENT ---
-if (loginBtn) loginBtn.addEventListener('click', handleLogin);
-
+// --- ATTACH LISTENERS ON WINDOW LOAD TO ENSURE ALL ELEMENTS ARE READY ---
+window.onload = attachGlobalListeners;
 // --- END OF COMPLETE REPLACEMENT CODE: js/main.js ---
