@@ -12,7 +12,7 @@ const firebaseConfig = {
     // measurementId is not needed for core functionality and is omitted here
 };
 
-// Initialize Firebase (Namespaced SDK style)
+// Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
@@ -24,12 +24,13 @@ let GLOBAL_USER_ROLE = null;
 let GLOBAL_USER_SCHOOL_ID = null;
 let CLASS_LIST_CACHE = []; // Cache to hold the fetched classes
 
-// References to HTML elements (These should be loaded successfully if your script is at the end of <body>)
+// References to HTML elements
 const authSection = document.getElementById('auth-section');
 const appSection = document.getElementById('app-section');
 const userNameEl = document.getElementById('userName');
 
 // Select elements that need the class list
+// These are checked at script load. If your tab sections load later, some may be null.
 const classSelectors = [
     document.getElementById('attClass'),
     document.getElementById('gradeClass'),
@@ -67,11 +68,10 @@ function populateClassSelectors(classes) {
         // Only set innerHTML if the element exists
         if (selectEl) {
             selectEl.innerHTML = fullHtml;
-            // Console confirmation for working elements
             console.log(`✅ Success: Populated selector ID: ${selectorName}`);
         } else {
-            // Specific error for the missing element
-            console.error(`🔴 ERROR: Class selector element with ID '${selectorName}' was not found in the DOM. This is the likely cause of the issue.`);
+            // Log a specific error for the missing element
+            console.error(`🔴 ERROR: Class selector element with ID '${selectorName}' was not found in the DOM. Check your HTML for typos or loading order.`);
         }
     });
 }
@@ -192,17 +192,11 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
 
     try {
         authSection.querySelector('#auth-status').textContent = "Logging in...";
-        // Use Namespaced syntax: firebase.auth().signInWithEmailAndPassword
         await auth.signInWithEmailAndPassword(email, password);
         // handleAuthState will take over upon success
     } catch (error) {
         console.error("Login failed:", error);
-        // Display user-friendly error message, extracting the actual Firebase error code
-        let errorMessage = error.message || "An unknown login error occurred.";
-        if (error.code) {
-             errorMessage = `Login failed (${error.code}).`;
-        }
-        authSection.querySelector('#auth-status').textContent = errorMessage;
+        authSection.querySelector('#auth-status').textContent = `Login failed: ${error.message}`;
     }
 });
 
