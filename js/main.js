@@ -162,9 +162,30 @@ function handleAuthState(user) {
         appSection.classList.remove('hidden');
         
         // Fetch profile and application data
-        fetchUserProfile(user.uid);
-        
-    } else {
+        async function fetchUserProfile(uid) {
+    try {
+        const userDoc = await db.collection('users').doc(uid).get();
+
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            GLOBAL_USER_ROLE = userData.role || 'guest';
+            GLOBAL_USER_SCHOOL_ID = userData.schoolId;
+
+            userNameEl.textContent = `${userData.name} (${GLOBAL_USER_ROLE})`;
+            console.log(`User Profile Loaded. Role: ${GLOBAL_USER_ROLE}, School ID: ${GLOBAL_USER_SCHOOL_ID}`);
+            
+            // --- CRUCIAL STEP 1: Fetch and populate the classes immediately after getting school ID ---
+            await fetchAndPopulateClasses();
+
+            // --- NEW: Enforce UI visibility based on the loaded role ---
+            enforceRoleVisibility(); // <--- ADD THIS LINE HERE
+
+            // --- CRUCIAL STEP 2: Initialize other modules after classes are loaded ---
+            // initAttendanceModule();
+            // initGradebookModule();
+            // etc...
+
+        } else {
         // User is signed out.
         authSection.classList.remove('hidden');
         appSection.classList.add('hidden');
@@ -209,15 +230,15 @@ document.querySelectorAll('.tab-btn').forEach(button => {
     button.addEventListener('click', (e) => {
         // 1. Update active button state
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-        e.target.classList.add('active');
+        e.target.classList.add('active'); // The button that was clicked gets 'active'
 
         // 2. Update visible section
-        const moduleId = e.target.getAttribute('data-module');
+        const moduleId = e.target.getAttribute('data-module'); // Gets the target section ID (e.g., 'students-module')
         document.querySelectorAll('.module-section').forEach(section => {
             if (section.id === moduleId) {
-                section.classList.add('active');
+                section.classList.add('active'); // The target section is shown
             } else {
-                section.classList.remove('active');
+                section.classList.remove('active'); // All other sections are hidden
             }
         });
     });
@@ -228,3 +249,46 @@ document.querySelectorAll('.tab-btn').forEach(button => {
 // 5. INITIALIZATION
 // =================================================================
 auth.onAuthStateChanged(handleAuthState);
+/**
+ * Shows/hides navigation tabs and modules based on the user's role.
+ */
+function enforceRoleVisibility() {
+    console.log(`Enforcing visibility for role: ${GLOBAL_USER_ROLE}`);
+    
+    // Define which roles can see which module sections
+    const moduleRoleMap = {
+        '#attendance-module': ['admin', 'teacher'],
+        '#gradebook-module': ['admin', 'teacher'],
+        '#students-module': ['admin'], // Assuming only admin can register/manage students
+        '#admin-tools-module': ['admin'],
+        // Add more modules/roles as needed
+    };
+
+    // Iterate through all modules and show/hide them
+    document.querySelectorAll('.module-section').forEach(section => {
+        const moduleId = '#' + section.id;
+        const navButton = document.querySelector(`.tab-btn[data-module="${section.id}"]`);
+        
+        // Determine if the current role is allowed to see this module
+        const allowedRoles = moduleRoleMap[moduleId] || [];
+        const isAllowed = allowedRoles.includes(GLOBAL_USER_ROLE);
+
+        if (isAllowed) {
+            section.classList.remove('hidden');
+            if (navButton) {
+                navButton.classList.remove('hidden');
+            }
+        } else {
+            section.classList.add('hidden');
+            if (navButton) {
+                navButton.classList.add('hidden');
+            }
+        }
+    });
+
+    // Automatically activate the first visible tab
+    const firstVisibleButton = document.querySelector('.tab-btn:not(.hidden)');
+    if (firstVisibleButton) {
+        firstVisibleButton.click(); // Trigger the click event to show the content
+    }
+}
