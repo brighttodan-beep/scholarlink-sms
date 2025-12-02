@@ -19,6 +19,10 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();     
 const db = firebase.firestore();  
 
+// Global variable to store the user's schoolId after login.
+// This is necessary for multi-tenancy reads (like fetching classes).
+let GLOBAL_USER_SCHOOL_ID = null;
+
 
 // =================================================================
 // 2. GLOBAL ROLE PERMISSIONS & UI HELPERS
@@ -100,8 +104,45 @@ function showStatus(elementId, message, type) {
 
 
 // =================================================================
-// 3. TAB SWITCHING LOGIC
+// 3. TAB SWITCHING LOGIC & DATA FETCHING (NEW CLASS LOGIC HERE)
 // =================================================================
+
+/**
+ * Fetches class data from Firestore and populates the class dropdown.
+ */
+async function fetchAndPopulateClasses() {
+    const classSelect = document.getElementById('newStudentClass');
+    if (!classSelect || !GLOBAL_USER_SCHOOL_ID) return; // Exit if no element or no school ID
+
+    // 1. Clear existing options
+    classSelect.innerHTML = '<option value="">Select Class</option>';
+
+    try {
+        // 2. Fetch the documents from the classes collection for the current school
+        const classesSnapshot = await db.collection('classes')
+            .where('schoolId', '==', GLOBAL_USER_SCHOOL_ID) // Use the global school ID
+            .get(); 
+
+        // 3. Populate the dropdown
+        if (classesSnapshot.empty) {
+            classSelect.innerHTML = '<option value="">No Classes Found</option>';
+            return;
+        }
+
+        classesSnapshot.forEach(doc => {
+            const classData = doc.data();
+            const option = document.createElement('option');
+            option.value = classData.name;
+            option.textContent = classData.name;
+            classSelect.appendChild(option);
+        });
+
+    } catch (error) {
+        console.error("Error fetching classes:", error);
+        // This will often catch the 'Permission Denied' error if rules are wrong
+        showStatus('studentRegStatus', 'Could not load classes list. Check permissions.', 'error');
+    }
+}
 
 /**
  * Handles the logic for switching between application modules/tabs.
@@ -119,6 +160,11 @@ function activateModule(moduleName) {
     if (activeSection) {
         activeSection.classList.add('active');
         activeSection.classList.remove('hidden');
+    }
+    
+    // NEW: If we switch to the student-management module, fetch the classes
+    if (moduleName === 'student-management') {
+         fetchAndPopulateClasses();
     }
 }
 
@@ -139,6 +185,7 @@ document.querySelectorAll('.tab-btn').forEach(button => {
 auth.onAuthStateChanged(user => {
     const authSection = document.getElementById('auth-section');
     const appSection = document.getElementById('app-section');
+    GLOBAL_USER_SCHOOL_ID = null; // Reset school ID on auth change
 
     if (user) {
         console.log("LOGGED-IN USER UID:", user.uid); // For provisioning help
@@ -158,13 +205,16 @@ auth.onAuthStateChanged(user => {
                                'error'); 
                     
                     applyRolePermissions(userRole); 
-                    appSection.classList.remove('hidden'); // Show the layout (which will be blank)
+                    appSection.classList.remove('hidden'); 
                     return; 
                 }
 
-                // 2. Document exists: proceed to get role
+                // 2. Document exists: proceed to get role and set global school ID
                 const userData = doc.data();
                 
+                // Set the global school ID for data queries
+                GLOBAL_USER_SCHOOL_ID = userData.schoolId; // 👈 SET GLOBAL VARIABLE
+
                 // ✅ FIX FOR SYNTAX ERROR: Safely default to 'guest' if role field is empty
                 const userRole = userData.role || 'guest'; 
                 
@@ -246,13 +296,19 @@ document.getElementById('addStudentBtn').addEventListener('click', async () => {
     }
 
     try {
-        // We need the user's role and schoolId to pass the security rules
+        // We rely on the GLOBAL_USER_SCHOOL_ID set during login
+        if (!GLOBAL_USER_SCHOOL_ID) {
+            showStatus(statusElementId, 'Error: Could not retrieve school ID. Please log out and back in.', 'error');
+            return;
+        }
+
+        // We still need the user's role to pass the security rules
         const userDoc = await db.collection('users').doc(user.uid).get();
         const userData = userDoc.data();
         
-        // Permission check: Only provisioned admins can write
-        if (!userData || userData.role !== 'admin' || !userData.schoolId) {
-             showStatus(statusElementId, 'Access Denied: You must be a provisioned Admin.', 'error');
+        // Permission check: Allows admin and teacher now (based on your request and security rules)
+        if (!userData || !['admin', 'teacher'].includes(userData.role) || userData.schoolId !== GLOBAL_USER_SCHOOL_ID) {
+             showStatus(statusElementId, 'Access Denied: You must be a provisioned Admin or Teacher from this school.', 'error');
              return;
         }
 
@@ -260,7 +316,7 @@ document.getElementById('addStudentBtn').addEventListener('click', async () => {
             name: studentName,
             class: studentClass,
             registeredBy: user.email, 
-            schoolId: userData.schoolId, // Crucial for passing the security rule
+            schoolId: GLOBAL_USER_SCHOOL_ID, // Use the global school ID
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         };
 
@@ -280,4 +336,3 @@ document.getElementById('addStudentBtn').addEventListener('click', async () => {
         }
     }
 });
-
