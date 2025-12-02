@@ -52,40 +52,57 @@ function enforceRoleVisibility() {
     // 🔑 Define which roles can see which module sections 🔑
     // Map the module section ID to an array of allowed roles
     const moduleRoleMap = {
-        'students-module': ['admin'],           // Student Registration/Management
-        'attendance-module': ['admin', 'teacher'], // Attendance Tracking
-        'gradebook-module': ['admin', 'teacher'],  // Grade Entry/Viewing
-        'lookup-module': ['admin', 'teacher'],     // Student Lookup
-        'admin-tools-module': ['admin'],       // Admin specific settings
-        // Add all your module IDs here
+        'students-module': ['admin'],                    // Student Registration/Management (Admin only)
+        'attendance-module': ['admin', 'teacher'],       // Attendance Tracking
+        'gradebook-module': ['admin', 'teacher'],        // Grade Entry/Viewing
+        'lookup-module': ['admin', 'teacher'],           // Student/Data Lookup
+        'admin-tools-module': ['admin'],                 // Admin specific settings
+        'parent-portal-module': ['parent'],              // Parent-specific views (e.g., viewing child's grades)
+        // Add all your remaining module IDs here
     };
+    
+    // Ensure all modules start hidden/inactive for clean slate before enforcing visibility
+    document.querySelectorAll('.module-section').forEach(section => {
+        section.classList.add('hidden');
+        section.classList.remove('active');
+    });
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.add('hidden');
+        btn.classList.remove('active');
+    });
 
-    // 1. Hide/Show Modules and Navigation Buttons
+    // 1. Hide/Show Modules and Navigation Buttons based on GLOBAL_USER_ROLE
+    let firstVisibleButton = null;
+
     document.querySelectorAll('.module-section').forEach(section => {
         const moduleId = section.id;
         // Find the navigation button corresponding to this section
         const navButton = document.querySelector(`.tab-btn[data-module="${moduleId}"]`);
         
+        // Get allowed roles and check permission
         const allowedRoles = moduleRoleMap[moduleId] || [];
-        const isAllowed = allowedRoles.includes(GLOBAL_USER_ROLE);
+        // Note: Using toLowerCase() here for robustness against case variations in the database.
+        const isAllowed = allowedRoles.includes(GLOBAL_USER_ROLE ? GLOBAL_USER_ROLE.toLowerCase() : null);
 
         if (isAllowed) {
-            section.classList.remove('hidden'); // Ensure module is available
+            section.classList.remove('hidden'); // SHOW module content
             if (navButton) {
-                navButton.classList.remove('hidden'); // Ensure button is available
-            }
-        } else {
-            section.classList.add('hidden');
-            if (navButton) {
-                navButton.classList.add('hidden');
+                navButton.classList.remove('hidden'); // SHOW navigation button
+                // Capture the first button found for automatic activation later
+                if (!firstVisibleButton) {
+                    firstVisibleButton = navButton;
+                }
             }
         }
+        // If not allowed, it remains hidden due to the initial reset above
     });
 
     // 2. Automatically activate the first visible tab
-    const firstVisibleButton = document.querySelector('.tab-btn:not(.hidden)');
     if (firstVisibleButton) {
         firstVisibleButton.click(); // Trigger the click event to show the content and activate the button style
+    } else {
+        console.warn("No visible modules found for this user role.");
+        // You might want to display a "Welcome" or "Unauthorized" message here
     }
 }
 
@@ -264,4 +281,5 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
 // 5. INITIALIZATION
 // =================================================================
 auth.onAuthStateChanged(handleAuthState);
+
 
