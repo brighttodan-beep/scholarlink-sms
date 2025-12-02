@@ -2,21 +2,22 @@
 // 1. FIREBASE CONFIGURATION & INITIALIZATION (Global Style)
 // =================================================================
 
-// This is the Configuration object you provided.
+// IMPORTANT: Ensure the SDK script tags (v8) are in your index.html!
 const firebaseConfig = {
-  apiKey: "AIzaSyDt1nGhKNXz6bLfLILUfJ_RnfD45_VgVX0",
-  authDomain: "scholarlink-sms-app.firebaseapp.com",
-  projectId: "scholarlink-sms-app",
-  storageBucket: "scholarlink-sms-app.firebasestorage.app",
-  messagingSenderId: "866758277016",
-  appId: "1:866758277016:web:c848393d8a0cce4ea5dded",
-  measurementId: "G-NLKTVVVQGZ"
+    // You must verify your key and project details are correct here.
+    apiKey: "AIzaSyDt1nGhKNXz6bLfLILUfJ_RnfD45_VgVX0",
+    authDomain: "scholarlink-sms-app.firebaseapp.com",
+    projectId: "scholarlink-sms-app",
+    storageBucket: "scholarlink-sms-app.firebasestorage.app",
+    messagingSenderId: "866758277016",
+    appId: "1:866758277016:web:c848393d8a0cce4ea5dded",
+    measurementId: "G-NLKTVVVQGZ"
 };
-// Initialize Firebase App globally, which makes firebase.auth() and firebase.firestore() available.
-// This assumes the required SDK script tags are loaded in index.html!
+
+// Initialize Firebase App globally.
 firebase.initializeApp(firebaseConfig); 
-const auth = firebase.auth();     // Defines the 'auth' variable globally for this script
-const db = firebase.firestore();  // Defines the 'db' variable globally for this script
+const auth = firebase.auth();     
+const db = firebase.firestore();  
 
 
 // =================================================================
@@ -39,7 +40,9 @@ const ROLE_PERMISSIONS = {
     ],
     'parent': [
         'parent-portal'
-    ], 
+    ],
+    // The default when the user role is not found or profile is missing:
+    'guest': [] 
 };
 
 /**
@@ -47,6 +50,7 @@ const ROLE_PERMISSIONS = {
  * @param {string} userRole - The role of the logged-in user.
  */
 function applyRolePermissions(userRole) {
+    // Use the role found, or default to 'guest' if the role lookup fails
     const allowedModules = ROLE_PERMISSIONS[userRole] || ROLE_PERMISSIONS['guest'];
     const allTabButtons = document.querySelectorAll('.tab-btn');
     const allSections = document.querySelectorAll('.module-section');
@@ -65,6 +69,7 @@ function applyRolePermissions(userRole) {
         section.classList.add('hidden');
     });
 
+    // Activate the first module the user is allowed to see
     if (allowedModules.length > 0) {
         activateModule(allowedModules[0]); 
     }
@@ -80,6 +85,7 @@ function applyRolePermissions(userRole) {
 function showStatus(elementId, message, type) {
     const statusEl = document.getElementById(elementId);
     if (statusEl) {
+        // Clear existing classes and set new ones
         statusEl.className = 'status-message alert mb-3 hidden';
         statusEl.classList.add(`alert-${type}`);
         statusEl.textContent = message;
@@ -128,63 +134,67 @@ document.querySelectorAll('.tab-btn').forEach(button => {
 // 4. AUTHENTICATION & ROLE CHECK
 // =================================================================
 
-// --- In js/main.js (Section 4) ---
-
 // Authentication state listener: runs on page load and on login/logout
 auth.onAuthStateChanged(user => {
     const authSection = document.getElementById('auth-section');
     const appSection = document.getElementById('app-section');
 
     if (user) {
-        // !!! COPY THIS UID FROM THE CONSOLE !!!
-        console.log("LOGGED-IN USER UID:", user.uid); // <-- NEW LINE ADDED HERE
+        console.log("LOGGED-IN USER UID:", user.uid); // For provisioning help
         // User is logged in. Fetch role and display app.
         authSection.classList.add('hidden');
         
-      // --- In js/main.js (Inside auth.onAuthStateChanged(user => { ... })) ---
+        // Fetch role from Firestore (Crucial step that relies on the rules!)
+        db.collection('users').doc(user.uid).get()
+            .then(doc => {
+                // 1. Check if the document EXISTS (Provisioning Check)
+                if (!doc.exists) {
+                    const userRole = 'guest'; // Use 'guest' for non-existent profiles
+                    document.getElementById('userName').textContent = `${user.email} (Unprovisioned)`;
 
-// Fetch role from Firestore (Crucial step that relies on the rules!)
-db.collection('users').doc(user.uid).get()
-    .then(doc => {
-        // MODIFICATION 1: Check if the document EXISTS 
-        if (!doc.exists) {
-            // Document is missing in /users collection
-            const userRole = 'unprovisioned';
-            document.getElementById('userName').textContent = `${user.email} (Unprovisioned)`;
+                    showStatus('auth-status', 
+                               'Login successful, but user profile is missing in Firestore. Contact admin.', 
+                               'error'); 
+                    
+                    applyRolePermissions(userRole); 
+                    appSection.classList.remove('hidden'); // Show the layout (which will be blank)
+                    return; 
+                }
 
-            // Display a specific error message to the user:
-            showStatus('auth-status', 
-                       'Login successful, but user profile is missing in Firestore. Contact admin.', 
-                       'error'); 
+                // 2. Document exists: proceed to get role
+                const userData = doc.data();
+                
+                // ✅ FIX FOR SYNTAX ERROR: Safely default to 'guest' if role field is empty
+                const userRole = userData.role || 'guest'; 
+                
+                document.getElementById('userName').textContent = `${user.email} (${userRole})`;
+                
+                applyRolePermissions(userRole); 
+                
+                appSection.classList.remove('hidden');
+
+            })
+            .catch(error => {
+                // 3. Handle fatal error (e.g., Security Rules block the /users read)
+                console.error("Fatal Error fetching user role:", error);
+                
+                showStatus('auth-status', 
+                           `Access Error: ${error.message}. Check API key and Security Rules.`, 
+                           'error');
+
+                // Keep the app hidden if we can't confirm the user's role
+                authSection.classList.remove('hidden');
+                appSection.classList.add('hidden');
+            });
             
-            applyRolePermissions(userRole); // 'unprovisioned' should show nothing (like 'guest')
-            return; // Stop execution here
-        }
-
-        // Document exists: proceed to get role and display app
-        const userData = doc.data();
-        const userRole = userData.role || 'guest'; // Use role from the data
-        
-        document.getElementById('userName').textContent = `${user.email} (${userRole})`;
-        
-        applyRolePermissions(userRole); 
-        
-        appSection.classList.remove('hidden');
-
-    })
-    .catch(error => {
-        // MODIFICATION 2: Provide a clear notification on fatal errors
-        console.error("Fatal Error fetching user role:", error);
-        
-        // Show an error message right on the login section status area
-        showStatus('auth-status', 
-                   `Access Error: ${error.message}. Check API key and security rules.`, 
-                   'error');
-
-        // Keep the app hidden if we can't fetch the role
-        authSection.classList.remove('hidden');
+    } else {
+        // User is logged out. Show login form.
         appSection.classList.add('hidden');
-    });
+        authSection.classList.remove('hidden');
+        document.getElementById('auth-status').textContent = 'Please log in.';
+    }
+});
+
 
 // Login Button Handler
 document.getElementById('loginBtn').addEventListener('click', async () => {
@@ -200,7 +210,6 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
         
     } catch (error) {
         console.error("Login error:", error.message);
-        // This is where you will see the API Key error or the "no user record" error
         authStatus.textContent = `Error: ${error.message}`;
     }
 });
@@ -240,6 +249,7 @@ document.getElementById('addStudentBtn').addEventListener('click', async () => {
         const userDoc = await db.collection('users').doc(user.uid).get();
         const userData = userDoc.data();
         
+        // Permission check: Only provisioned admins can write
         if (!userData || userData.role !== 'admin' || !userData.schoolId) {
              showStatus(statusElementId, 'Access Denied: You must be a provisioned Admin.', 'error');
              return;
@@ -269,8 +279,3 @@ document.getElementById('addStudentBtn').addEventListener('click', async () => {
         }
     }
 });
-
-
-
-
-
