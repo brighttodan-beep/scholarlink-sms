@@ -38,7 +38,9 @@ const ROLE_PERMISSIONS = {
         'grade', 
         'parent-portal'
     ],
-    'guest': [] 
+    'parent': [
+        'parent-portal'
+    ], 
 };
 
 /**
@@ -46,7 +48,7 @@ const ROLE_PERMISSIONS = {
  * @param {string} userRole - The role of the logged-in user.
  */
 function applyRolePermissions(userRole) {
-    const allowedModules = ROLE_PERMISSIONS[userRole] || ROLE_PERMISSIONS['guest'];
+    const allowedModules = ROLE_PERMISSIONS[userRole] || ROLE_PERMISSIONS['admin','teacher','parent'];
     const allTabButtons = document.querySelectorAll('.tab-btn');
     const allSections = document.querySelectorAll('.module-section');
     
@@ -162,7 +164,7 @@ db.collection('users').doc(user.uid).get()
 
         // Document exists: proceed to get role and display app
         const userData = doc.data();
-        const userRole = userData.role || 'guest'; // Use role from the data
+        const userRole = userData.role || 'admin','teacher','parent'; // Use role from the data
         
         document.getElementById('userName').textContent = `${user.email} (${userRole})`;
         
@@ -268,5 +270,6 @@ document.getElementById('addStudentBtn').addEventListener('click', async () => {
         }
     }
 });
+
 
 
