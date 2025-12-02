@@ -4,15 +4,14 @@
 
 // This is the Configuration object you provided.
 const firebaseConfig = {
-    apiKey: "AIzaSyDt1nGhKNXz6bLfLILUfJ_RnfD45_VgVX0",
-    authDomain: "scholarlink-sms-app.firebaseapp.com",
-    projectId: "scholarlink-sms-app",
-    storageBucket: "scholarlink-sms-app.firebasestorage.app",
-    messagingSenderId: "866758277016",
-    appId: "1:866758277016:web:c848393d8a0cce4ea5dded",
-    measurementId: "G-NLKTVVVQGZ" // We will ignore this for core functions
+  apiKey: "AIzaSyDt1nGhKNXz6bLfLILUfJ_RnfD45_VgVX0",
+  authDomain: "scholarlink-sms-app.firebaseapp.com",
+  projectId: "scholarlink-sms-app",
+  storageBucket: "scholarlink-sms-app.firebasestorage.app",
+  messagingSenderId: "866758277016",
+  appId: "1:866758277016:web:c848393d8a0cce4ea5dded",
+  measurementId: "G-NLKTVVVQGZ"
 };
-
 // Initialize Firebase App globally, which makes firebase.auth() and firebase.firestore() available.
 // This assumes the required SDK script tags are loaded in index.html!
 firebase.initializeApp(firebaseConfig); 
@@ -270,6 +269,7 @@ document.getElementById('addStudentBtn').addEventListener('click', async () => {
         }
     }
 });
+
 
 
 
