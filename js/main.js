@@ -140,33 +140,50 @@ auth.onAuthStateChanged(user => {
         // User is logged in. Fetch role and display app.
         authSection.classList.add('hidden');
         
-        // Fetch role from Firestore (Crucial step that relies on the rules!)
-        db.collection('users').doc(user.uid).get()
-            .then(doc => {
-                const userRole = doc.data()?.role || 'guest';
-                
-                document.getElementById('userName').textContent = `${user.email} (${userRole})`;
-                
-                applyRolePermissions(userRole); 
-                
-                appSection.classList.remove('hidden');
+      // --- In js/main.js (Inside auth.onAuthStateChanged(user => { ... })) ---
 
-            })
-            .catch(error => {
-                console.error("Error fetching user role:", error);
-                // On permission denied (likely happening now), defaults to guest
-                applyRolePermissions('guest'); 
-                appSection.classList.remove('hidden');
-            });
+// Fetch role from Firestore (Crucial step that relies on the rules!)
+db.collection('users').doc(user.uid).get()
+    .then(doc => {
+        // MODIFICATION 1: Check if the document EXISTS 
+        if (!doc.exists) {
+            // Document is missing in /users collection
+            const userRole = 'unprovisioned';
+            document.getElementById('userName').textContent = `${user.email} (Unprovisioned)`;
+
+            // Display a specific error message to the user:
+            showStatus('auth-status', 
+                       'Login successful, but user profile is missing in Firestore. Contact admin.', 
+                       'error'); 
             
-    } else {
-        // User is logged out. Show login form.
-        appSection.classList.add('hidden');
-        authSection.classList.remove('hidden');
-        document.getElementById('auth-status').textContent = 'Please log in.';
-    }
-});
+            applyRolePermissions(userRole); // 'unprovisioned' should show nothing (like 'guest')
+            return; // Stop execution here
+        }
 
+        // Document exists: proceed to get role and display app
+        const userData = doc.data();
+        const userRole = userData.role || 'guest'; // Use role from the data
+        
+        document.getElementById('userName').textContent = `${user.email} (${userRole})`;
+        
+        applyRolePermissions(userRole); 
+        
+        appSection.classList.remove('hidden');
+
+    })
+    .catch(error => {
+        // MODIFICATION 2: Provide a clear notification on fatal errors
+        console.error("Fatal Error fetching user role:", error);
+        
+        // Show an error message right on the login section status area
+        showStatus('auth-status', 
+                   `Access Error: ${error.message}. Check API key and security rules.`, 
+                   'error');
+
+        // Keep the app hidden if we can't fetch the role
+        authSection.classList.remove('hidden');
+        appSection.classList.add('hidden');
+    });
 
 // Login Button Handler
 document.getElementById('loginBtn').addEventListener('click', async () => {
@@ -251,4 +268,5 @@ document.getElementById('addStudentBtn').addEventListener('click', async () => {
         }
     }
 });
+
 
