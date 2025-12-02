@@ -240,11 +240,12 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
         return;
     }
 
+    // ⭐ THIS IS THE CRITICAL SECTION THAT NEEDS A CATCH BLOCK ⭐
     try {
         authSection.querySelector('#auth-status').textContent = "Logging in...";
         await auth.signInWithEmailAndPassword(email, password);
         // handleAuthState will take over upon success
-    } catch (error) {
+    } catch (error) { // <--- THIS CATCH BLOCK MUST BE PRESENT
         console.error("Login failed:", error);
         let errorMessage = error.message || "An unknown login error occurred.";
         if (error.code) {
@@ -257,28 +258,10 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
 document.getElementById('logoutBtn').addEventListener('click', () => {
     auth.signOut();
 });
-
-// Tab switching logic (basic implementation) - This handles the click effect
-document.querySelectorAll('.tab-btn').forEach(button => {
-    button.addEventListener('click', (e) => {
-        // 1. Update active button state
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-        e.currentTarget.classList.add('active'); // Use currentTarget for reliability
-
-        // 2. Update visible section
-        const moduleId = e.currentTarget.getAttribute('data-module');
-        document.querySelectorAll('.module-section').forEach(section => {
-            if (section.id === moduleId) {
-                section.classList.add('active'); // CSS should make this visible (e.g., display: block)
-            } else {
-                section.classList.remove('active'); // CSS should make this hidden (e.g., display: none)
-            }
-        });
-    });
-});
-
+// ... rest of the code follows
 
 // =================================================================
 // 5. INITIALIZATION
 // =================================================================
 auth.onAuthStateChanged(handleAuthState);
+
