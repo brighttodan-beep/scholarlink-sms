@@ -1,338 +1,218 @@
 // =================================================================
-// 1. FIREBASE CONFIGURATION & INITIALIZATION (Global Style)
+// 1. FIREBASE CONFIGURATION (REPLACE WITH YOUR ACTUAL CONFIG)
 // =================================================================
 
-// IMPORTANT: Ensure the SDK script tags (v8) are in your index.html!
 const firebaseConfig = {
-    // You must verify your key and project details are correct here.
-    apiKey: "AIzaSyDt1nGhKNXz6bLfLILUfJ_RnfD45_VgVX0",
-    authDomain: "scholarlink-sms-app.firebaseapp.com",
-    projectId: "scholarlink-sms-app",
-    storageBucket: "scholarlink-sms-app.firebasestorage.app",
-    messagingSenderId: "866758277016",
-    appId: "1:866758277016:web:c848393d8a0cce4ea5dded",
-    measurementId: "G-NLKTVVVQGZ"
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
 };
 
-// Initialize Firebase App globally.
-firebase.initializeApp(firebaseConfig); 
-const auth = firebase.auth();     
-const db = firebase.firestore();  
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
 
-// Global variable to store the user's schoolId after login.
-// This is necessary for multi-tenancy reads (like fetching classes).
+// =================================================================
+// 2. GLOBAL VARIABLES
+// =================================================================
+let GLOBAL_USER_ROLE = null;
 let GLOBAL_USER_SCHOOL_ID = null;
+let CLASS_LIST_CACHE = []; // Cache to hold the fetched classes
+
+// References to HTML elements
+const authSection = document.getElementById('auth-section');
+const appSection = document.getElementById('app-section');
+const userNameEl = document.getElementById('userName');
+
+// Select elements that need the class list
+const classSelectors = [
+    document.getElementById('attClass'),
+    document.getElementById('gradeClass'),
+    document.getElementById('newStudentClass'),
+    document.getElementById('adminStudentClassSelect'),
+    document.getElementById('lookupClass')
+];
 
 
 // =================================================================
-// 2. GLOBAL ROLE PERMISSIONS & UI HELPERS
+// 3. CORE APPLICATION FUNCTIONS
 // =================================================================
-
-// Map of roles to the section IDs (data-module attributes) they can access
-const ROLE_PERMISSIONS = {
-    'admin': [
-        'attendance', 
-        'grade', 
-        'student-management', 
-        'parent-portal', 
-        'headmaster-dashboard'
-    ],
-    'teacher': [
-        'attendance', 
-        'grade',
-        'student-management',
-        'parent-portal'
-    ],
-    'parent': [
-        'parent-portal'
-    ],
-    // The default when the user role is not found or profile is missing:
-    'guest': [] 
-};
 
 /**
- * Hides unauthorized tabs and sections based on the user's role.
- * @param {string} userRole - The role of the logged-in user.
+ * Populates all class dropdown selectors with data from the global cache.
+ * @param {Array<Object>} classes - Array of class objects { id: '...', name: '...' }
  */
-function applyRolePermissions(userRole) {
-    // Use the role found, or default to 'guest' if the role lookup fails
-    const allowedModules = ROLE_PERMISSIONS[userRole] || ROLE_PERMISSIONS['guest'];
-    const allTabButtons = document.querySelectorAll('.tab-btn');
-    const allSections = document.querySelectorAll('.module-section');
-    
-    allTabButtons.forEach(tabBtn => {
-        const moduleName = tabBtn.getAttribute('data-module');
-        if (allowedModules.includes(moduleName)) {
-            tabBtn.classList.remove('hidden'); 
-        } else {
-            tabBtn.classList.add('hidden');    
+function populateClassSelectors(classes) {
+    if (classes.length === 0) {
+        console.warn("No classes found to populate selectors.");
+        return;
+    }
+
+    const defaultOption = '<option value="">-- Select Class --</option>';
+    const optionsHtml = classes.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    const fullHtml = defaultOption + optionsHtml;
+
+    classSelectors.forEach(selectEl => {
+        // Only set innerHTML if the element exists
+        if (selectEl) {
+            selectEl.innerHTML = fullHtml;
         }
     });
-
-    allSections.forEach(section => {
-        section.classList.remove('active');
-        section.classList.add('hidden');
-    });
-
-    // Activate the first module the user is allowed to see
-    if (allowedModules.length > 0) {
-        activateModule(allowedModules[0]); 
-    }
 }
 
 
 /**
- * Displays a temporary status message in a designated element.
- * @param {string} elementId - The ID of the div to display the message in.
- * @param {string} message - The message text.
- * @param {string} type - 'success', 'error', or 'info'.
- */
-function showStatus(elementId, message, type) {
-    const statusEl = document.getElementById(elementId);
-    if (statusEl) {
-        // Clear existing classes and set new ones
-        statusEl.className = 'status-message alert mb-3 hidden';
-        statusEl.classList.add(`alert-${type}`);
-        statusEl.textContent = message;
-        statusEl.classList.remove('hidden');
-        setTimeout(() => {
-            statusEl.classList.add('hidden');
-            statusEl.textContent = '';
-        }, 3000); 
-    }
-}
-
-
-// =================================================================
-// 3. TAB SWITCHING LOGIC & DATA FETCHING (NEW CLASS LOGIC HERE)
-// =================================================================
-
-/**
- * Fetches class data from Firestore and populates the class dropdown.
+ * Fetches the list of classes for the authenticated user's school.
  */
 async function fetchAndPopulateClasses() {
-    const classSelect = document.getElementById('newStudentClass');
-    if (!classSelect || !GLOBAL_USER_SCHOOL_ID) return; // Exit if no element or no school ID
-
-    // 1. Clear existing options
-    classSelect.innerHTML = '<option value="">Select Class</option>';
+    if (!GLOBAL_USER_SCHOOL_ID) {
+        console.error("Cannot fetch classes: GLOBAL_USER_SCHOOL_ID is missing.");
+        return;
+    }
 
     try {
-        // 2. Fetch the documents from the classes collection for the current school
-        const classesSnapshot = await db.collection('classes')
-            .where('schoolId', '==', GLOBAL_USER_SCHOOL_ID) // Use the global school ID
-            .get(); 
+        const classesRef = db.collection('classes');
+        const querySnapshot = await classesRef
+            .where('schoolId', '==', GLOBAL_USER_SCHOOL_ID)
+            .orderBy('sortOrder', 'asc') // Assuming you have a field for ordering
+            .get();
 
-        // 3. Populate the dropdown
-        if (classesSnapshot.empty) {
-            classSelect.innerHTML = '<option value="">No Classes Found</option>';
-            return;
-        }
+        const classes = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            name: doc.data().name || doc.id // Use 'name' field if available, otherwise use doc.id
+        }));
 
-        classesSnapshot.forEach(doc => {
-            const classData = doc.data();
-            const option = document.createElement('option');
-            option.value = classData.name;
-            option.textContent = classData.name;
-            classSelect.appendChild(option);
-        });
+        CLASS_LIST_CACHE = classes;
+        populateClassSelectors(classes);
+
+        console.log(`Successfully loaded ${classes.length} classes for school: ${GLOBAL_USER_SCHOOL_ID}`);
 
     } catch (error) {
         console.error("Error fetching classes:", error);
-        // This will often catch the 'Permission Denied' error if rules are wrong
-        showStatus('studentRegStatus', 'Could not load classes list. Check permissions.', 'error');
+        alert("Failed to load class list. Check console for details.");
     }
 }
+
 
 /**
- * Handles the logic for switching between application modules/tabs.
- * @param {string} moduleName - The ID of the module section to activate.
+ * Fetches the user's profile, sets global role/schoolId, and loads application data.
+ * @param {string} uid - The Firebase User UID
  */
-function activateModule(moduleName) {
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelectorAll('.module-section').forEach(section => section.classList.remove('active'));
-    document.querySelectorAll('.module-section').forEach(section => section.classList.add('hidden'));
+async function fetchUserProfile(uid) {
+    try {
+        const userDoc = await db.collection('users').doc(uid).get();
 
-    const activeBtn = document.querySelector(`.tab-btn[data-module="${moduleName}"]`);
-    const activeSection = document.getElementById(moduleName);
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            GLOBAL_USER_ROLE = userData.role || 'guest';
+            GLOBAL_USER_SCHOOL_ID = userData.schoolId;
 
-    if (activeBtn) activeBtn.classList.add('active');
-    if (activeSection) {
-        activeSection.classList.add('active');
-        activeSection.classList.remove('hidden');
-    }
-    
-    // NEW: If we switch to the student-management module, fetch the classes
-    if (moduleName === 'student-management') {
-         fetchAndPopulateClasses();
+            userNameEl.textContent = `${userData.name} (${GLOBAL_USER_ROLE})`;
+            console.log(`User Profile Loaded. Role: ${GLOBAL_USER_ROLE}, School ID: ${GLOBAL_USER_SCHOOL_ID}`);
+            
+            // --- CRUCIAL STEP 1: Fetch and populate the classes immediately after getting school ID ---
+            await fetchAndPopulateClasses();
+
+            // --- CRUCIAL STEP 2: Initialize other modules after classes are loaded ---
+            // initAttendanceModule();
+            // initGradebookModule();
+            // etc...
+
+        } else {
+            console.error("User profile document not found in /users collection.");
+            authSection.querySelector('#auth-status').textContent = "Profile not provisioned. Contact administrator.";
+            auth.signOut(); // Force sign out if profile is missing
+        }
+    } catch (error) {
+        console.error("Error fetching user profile:", error);
+        authSection.querySelector('#auth-status').textContent = `Error loading profile: ${error.message}`;
+        auth.signOut();
     }
 }
 
-// Event listener for sidebar tabs
+
+// =================================================================
+// 4. AUTHENTICATION & UI HANDLERS
+// =================================================================
+
+/**
+ * Handles the application state change (logged in vs. logged out).
+ * @param {firebase.User} user - The authenticated user object or null.
+ */
+function handleAuthState(user) {
+    if (user) {
+        // User is signed in.
+        authSection.classList.add('hidden');
+        appSection.classList.remove('hidden');
+        
+        // Fetch profile and application data
+        fetchUserProfile(user.uid);
+        
+    } else {
+        // User is signed out.
+        authSection.classList.remove('hidden');
+        appSection.classList.add('hidden');
+        
+        // Reset global state
+        GLOBAL_USER_ROLE = null;
+        GLOBAL_USER_SCHOOL_ID = null;
+        CLASS_LIST_CACHE = [];
+        populateClassSelectors([]); // Clear dropdowns
+        
+        userNameEl.textContent = 'User';
+        authSection.querySelector('#auth-status').textContent = "Please log in. (Registration is disabled)";
+    }
+}
+
+// Attach listeners
+document.getElementById('loginBtn').addEventListener('click', async () => {
+    const email = document.getElementById('loginEmail').value;
+    const password = document.getElementById('loginPassword').value;
+    
+    if (!email || !password) {
+        alert("Please enter both email and password.");
+        return;
+    }
+
+    try {
+        authSection.querySelector('#auth-status').textContent = "Logging in...";
+        await auth.signInWithEmailAndPassword(email, password);
+        // handleAuthState will take over upon success
+    } catch (error) {
+        console.error("Login failed:", error);
+        authSection.querySelector('#auth-status').textContent = `Login failed: ${error.message}`;
+    }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+    auth.signOut();
+});
+
+// Tab switching logic (basic implementation)
 document.querySelectorAll('.tab-btn').forEach(button => {
     button.addEventListener('click', (e) => {
-        const moduleName = e.target.getAttribute('data-module');
-        activateModule(moduleName);
+        // 1. Update active button state
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        e.target.classList.add('active');
+
+        // 2. Update visible section
+        const moduleId = e.target.getAttribute('data-module');
+        document.querySelectorAll('.module-section').forEach(section => {
+            if (section.id === moduleId) {
+                section.classList.add('active');
+            } else {
+                section.classList.remove('active');
+            }
+        });
     });
 });
 
 
 // =================================================================
-// 4. AUTHENTICATION & ROLE CHECK
+// 5. INITIALIZATION
 // =================================================================
-
-// Authentication state listener: runs on page load and on login/logout
-auth.onAuthStateChanged(user => {
-    const authSection = document.getElementById('auth-section');
-    const appSection = document.getElementById('app-section');
-    GLOBAL_USER_SCHOOL_ID = null; // Reset school ID on auth change
-
-    if (user) {
-        console.log("LOGGED-IN USER UID:", user.uid); // For provisioning help
-        // User is logged in. Fetch role and display app.
-        authSection.classList.add('hidden');
-        
-        // Fetch role from Firestore (Crucial step that relies on the rules!)
-        db.collection('users').doc(user.uid).get()
-            .then(doc => {
-                // 1. Check if the document EXISTS (Provisioning Check)
-                if (!doc.exists) {
-                    const userRole = 'guest'; // Use 'guest' for non-existent profiles
-                    document.getElementById('userName').textContent = `${user.email} (Unprovisioned)`;
-
-                    showStatus('auth-status', 
-                               'Login successful, but user profile is missing in Firestore. Contact admin.', 
-                               'error'); 
-                    
-                    applyRolePermissions(userRole); 
-                    appSection.classList.remove('hidden'); 
-                    return; 
-                }
-
-                // 2. Document exists: proceed to get role and set global school ID
-                const userData = doc.data();
-                
-                // Set the global school ID for data queries
-                GLOBAL_USER_SCHOOL_ID = userData.schoolId; // 👈 SET GLOBAL VARIABLE
-
-                // ✅ FIX FOR SYNTAX ERROR: Safely default to 'guest' if role field is empty
-                const userRole = userData.role || 'guest'; 
-                
-                document.getElementById('userName').textContent = `${user.email} (${userRole})`;
-                
-                applyRolePermissions(userRole); 
-                
-                appSection.classList.remove('hidden');
-
-            })
-            .catch(error => {
-                // 3. Handle fatal error (e.g., Security Rules block the /users read)
-                console.error("Fatal Error fetching user role:", error);
-                
-                showStatus('auth-status', 
-                           `Access Error: ${error.message}. Check API key and Security Rules.`, 
-                           'error');
-
-                // Keep the app hidden if we can't confirm the user's role
-                authSection.classList.remove('hidden');
-                appSection.classList.add('hidden');
-            });
-            
-    } else {
-        // User is logged out. Show login form.
-        appSection.classList.add('hidden');
-        authSection.classList.remove('hidden');
-        document.getElementById('auth-status').textContent = 'Please log in.';
-    }
-});
-
-
-// Login Button Handler
-document.getElementById('loginBtn').addEventListener('click', async () => {
-    const email = document.getElementById('loginEmail').value;
-    const password = document.getElementById('loginPassword').value;
-    const authStatus = document.getElementById('auth-status');
-    
-    authStatus.textContent = 'Logging in...';
-
-    try {
-        await auth.signInWithEmailAndPassword(email, password);
-        authStatus.textContent = 'Login successful!';
-        
-    } catch (error) {
-        console.error("Login error:", error.message);
-        authStatus.textContent = `Error: ${error.message}`;
-    }
-});
-
-// Logout Button Handler
-document.getElementById('logoutBtn').addEventListener('click', async () => {
-    try {
-        await auth.signOut();
-    } catch (error) {
-        console.error("Logout error:", error);
-    }
-});
-
-
-// =================================================================
-// 5. STUDENT REGISTRATION LOGIC
-// =================================================================
-
-document.getElementById('addStudentBtn').addEventListener('click', async () => {
-    const studentName = document.getElementById('newStudentName').value.trim();
-    const studentClass = document.getElementById('newStudentClass').value;
-    const statusElementId = 'studentRegStatus'; 
-
-    if (!studentName || !studentClass) {
-        showStatus(statusElementId, 'Please enter a name and select a class.', 'error');
-        return;
-    }
-
-    const user = auth.currentUser; 
-    if (!user) {
-        showStatus(statusElementId, 'Authentication required to register students.', 'error');
-        return;
-    }
-
-    try {
-        // We rely on the GLOBAL_USER_SCHOOL_ID set during login
-        if (!GLOBAL_USER_SCHOOL_ID) {
-            showStatus(statusElementId, 'Error: Could not retrieve school ID. Please log out and back in.', 'error');
-            return;
-        }
-
-        // We still need the user's role to pass the security rules
-        const userDoc = await db.collection('users').doc(user.uid).get();
-        const userData = userDoc.data();
-        
-        // Permission check: Allows admin and teacher now (based on your request and security rules)
-        if (!userData || !['admin', 'teacher'].includes(userData.role) || userData.schoolId !== GLOBAL_USER_SCHOOL_ID) {
-             showStatus(statusElementId, 'Access Denied: You must be a provisioned Admin or Teacher from this school.', 'error');
-             return;
-        }
-
-        const studentData = {
-            name: studentName,
-            class: studentClass,
-            registeredBy: user.email, 
-            schoolId: GLOBAL_USER_SCHOOL_ID, // Use the global school ID
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-        };
-
-        await db.collection('students').add(studentData); 
-        
-        showStatus(statusElementId, `Student "${studentName}" successfully registered!`, 'success');
-
-        document.getElementById('newStudentName').value = '';
-        
-    } catch (error) {
-        console.error("Error adding student:", error);
-        // Check for permission denied error due to security rules
-        if (error.message.includes('permission denied')) {
-            showStatus(statusElementId, 'Permission Denied. Check your user role and school ID in Firestore.', 'error');
-        } else {
-            showStatus(statusElementId, `Error registering student: ${error.message}`, 'error');
-        }
-    }
-});
+auth.onAuthStateChanged(handleAuthState);
