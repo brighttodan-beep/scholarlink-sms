@@ -3,7 +3,8 @@
 // =================================================================
 
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
+    // NOTE: REPLACE THESE PLACEHOLDERS WITH YOUR ACTUAL CONFIGURATION
+    apiKey: "YOUR_API_KEY", 
     authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
     projectId: "YOUR_PROJECT_ID",
     storageBucket: "YOUR_PROJECT_ID.appspot.com",
@@ -29,6 +30,7 @@ const appSection = document.getElementById('app-section');
 const userNameEl = document.getElementById('userName');
 
 // Select elements that need the class list
+// These are checked at script load. If your tab sections load later, some may be null.
 const classSelectors = [
     document.getElementById('attClass'),
     document.getElementById('gradeClass'),
@@ -44,6 +46,7 @@ const classSelectors = [
 
 /**
  * Populates all class dropdown selectors with data from the global cache.
+ * Includes enhanced logging to catch missing elements.
  * @param {Array<Object>} classes - Array of class objects { id: '...', name: '...' }
  */
 function populateClassSelectors(classes) {
@@ -56,10 +59,19 @@ function populateClassSelectors(classes) {
     const optionsHtml = classes.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
     const fullHtml = defaultOption + optionsHtml;
 
-    classSelectors.forEach(selectEl => {
+    // Array of the original IDs for logging purposes
+    const selectorNames = ['attClass', 'gradeClass', 'newStudentClass', 'adminStudentClassSelect', 'lookupClass'];
+    
+    classSelectors.forEach((selectEl, index) => {
+        const selectorName = selectorNames[index];
+        
         // Only set innerHTML if the element exists
         if (selectEl) {
             selectEl.innerHTML = fullHtml;
+            console.log(`✅ Success: Populated selector ID: ${selectorName}`);
+        } else {
+            // Log a specific error for the missing element
+            console.error(`🔴 ERROR: Class selector element with ID '${selectorName}' was not found in the DOM. Check your HTML for typos or loading order.`);
         }
     });
 }
@@ -78,12 +90,12 @@ async function fetchAndPopulateClasses() {
         const classesRef = db.collection('classes');
         const querySnapshot = await classesRef
             .where('schoolId', '==', GLOBAL_USER_SCHOOL_ID)
-            .orderBy('sortOrder', 'asc') // Assuming you have a field for ordering
+            .orderBy('sortOrder', 'asc')
             .get();
 
         const classes = querySnapshot.docs.map(doc => ({
             id: doc.id,
-            name: doc.data().name || doc.id // Use 'name' field if available, otherwise use doc.id
+            name: doc.data().name || doc.id
         }));
 
         CLASS_LIST_CACHE = classes;
