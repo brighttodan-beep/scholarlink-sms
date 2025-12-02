@@ -35,7 +35,8 @@ const ROLE_PERMISSIONS = {
     ],
     'teacher': [
         'attendance', 
-        'grade', 
+        'grade',
+        'student-management',
         'parent-portal'
     ],
     'parent': [
@@ -279,3 +280,4 @@ document.getElementById('addStudentBtn').addEventListener('click', async () => {
         }
     }
 });
+
